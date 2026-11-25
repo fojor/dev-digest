@@ -1,4 +1,4 @@
-import type { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
+import type { CiFailOn, Finding, Provider, ReviewStrategy } from '@devdigest/shared';
 
 /**
  * Domain types of the reviews module. Plain TS, no Drizzle: the field names and
@@ -21,6 +21,15 @@ export interface ReviewAgent {
   ciFailOn: CiFailOn;
   repoIntel: boolean;
   version: number;
+}
+
+/** A skill as the review prompt needs it (linked, enabled, in link order). */
+export interface PromptSkill {
+  id: string;
+  version: number;
+  name: string;
+  description: string;
+  body: string;
 }
 
 /** The pull request a review runs against. */
@@ -128,3 +137,16 @@ export interface ActiveRun {
   agent_name: string | null;
   ran_at: string | null;
 }
+
+/** One skill a run's prompt contained (persisted as a run_skills row). */
+export interface RunSkillRecord {
+  skillId: string;
+  skillVersion: number;
+  /** 0-based position in the prompt's Skills section. */
+  position: number;
+  /** Tokens of the skill's rendered block. */
+  tokens: number;
+}
+
+/** A finding to persist, with the skill it is attributed to (null = none). */
+export type AttributedFinding = Finding & { skillId?: string | null };

@@ -94,10 +94,13 @@ export async function registerAgentsRoutes(
     { schema: { params: IdParams, body: SetSkillsBody } },
     async (req) => {
       const { workspaceId } = await context(req);
-      const { skill_ids, skill_id, order } = req.body;
+      const { skills, skill_ids, skill_id, order } = req.body;
+      const set =
+        skills?.map((s) => ({ skillId: s.skill_id, enabled: s.enabled })) ??
+        skill_ids?.map((skillId) => ({ skillId, enabled: true }));
       const links =
-        skill_ids !== undefined
-          ? await service.setSkills(workspaceId, req.params.id, skill_ids)
+        set !== undefined
+          ? await service.setSkills(workspaceId, req.params.id, set)
           : await service.linkSkill(workspaceId, req.params.id, skill_id!, order);
       return presentSkillLinks(req.params.id, links);
     },

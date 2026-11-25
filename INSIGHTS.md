@@ -8,6 +8,8 @@ Selection rules, review and promotion to CLAUDE.md — skill `engineering-insigh
 
 ## What Doesn't Work
 
+- 2026-11-25 · skills on/off control experiment · telling the agent's base prompt 'without skills, do not invent criteria' did NOT stop deepseek-v4-flash from flagging an obvious gap (4 untested guard branches next to a single happy-path test were flagged with and without skills; only the boundary cases needed the skill) → when a seeded PR must show 'missed without skills, caught with skills', make the gap non-obvious (partial coverage, an equality boundary) and confirm it over several runs before relying on it, because a model's default review already catches glaring gaps whatever the prompt says · PR #501 runs 35085ac1 vs 808e7f35, server/src/db/seed-experiment.ts
+
 ## Codebase Patterns
 
 - 2026-11-20 · .claude/insights guard · guard.mjs only intercepts Write|Edit|MultiEdit, so a shell write (sed -i, >, node fs) to INSIGHTS*.md bypasses append-only silently → NEVER modify INSIGHTS files via Bash except a deliberate, user-approved header change, and ALWAYS diff the body afterwards, because git is the only safety net there · .claude/settings.json PreToolUse matcher, .claude/skills/engineering-insights/hooks/guard.mjs

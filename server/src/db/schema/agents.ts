@@ -61,6 +61,9 @@ export const agentSkills = pgTable(
       .notNull()
       .references(() => skills.id, { onDelete: 'cascade' }),
     order: integer('order').notNull().default(0),
+    // Per-agent on/off. An unchecked skill keeps its link (and position) so
+    // re-enabling it restores the order; only enabled links reach the prompt.
+    enabled: boolean('enabled').notNull().default(true),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.agentId, t.skillId] }),

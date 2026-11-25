@@ -28,6 +28,7 @@ export function buildRunTrace(
     costUsd: number | null;
     findings: number;
     grounding: string;
+    skillsTokens: number | null;
   },
 ): RunTrace {
   const { durationMs, tokensIn, tokensOut, costUsd, grounding } = stats;
@@ -48,7 +49,7 @@ export function buildRunTrace(
       findings: stats.findings,
       grounding,
     },
-    prompt_assembly: outcome.assembly,
+    prompt_assembly: { ...outcome.assembly, skills_tokens: stats.skillsTokens },
     tool_calls: outcome.chunks.map((c) => ({
       tool: 'review_file',
       args: c.label,

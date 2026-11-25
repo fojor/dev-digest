@@ -33,6 +33,33 @@ export function wrapUntrusted(label: string, content: string): string {
   return `<untrusted source="${label}">\n${safe}\n</untrusted>`;
 }
 
+/**
+ * Trusted instruction placed at the top of `## Skills / rules`: asks the model
+ * to tag each finding with the skill that produced it (Finding.skill). The
+ * server keeps a tag only when it names a skill that was in this prompt.
+ * Not part of INJECTION_GUARD — that rule stays the single injection defense.
+ */
+export const SKILL_ATTRIBUTION_RULE =
+  "For each finding produced by one of these skills, set `skill` to that skill's name exactly; otherwise leave it null.";
+
+/** What a skill contributes to the prompt (name + description head the body). */
+export interface SkillBlockInput {
+  name: string;
+  description: string;
+  body: string;
+}
+
+/**
+ * One skill as it appears in the prompt's "Skills / rules" section. The name
+ * and description (the skill's "interface") head the block so the model knows
+ * when the rules below apply; blocks keep the agent's link order. The client
+ * mirrors this format for the skill Preview (pinned by a shared fixture).
+ */
+export function renderSkillBlock(skill: SkillBlockInput): string {
+  const desc = skill.description.trim() ? `\n_${skill.description.trim()}_` : '';
+  return `### Skill: ${skill.name}${desc}\n\n${skill.body.trim()}`;
+}
+
 /** Cap the PR description so a huge author body can't blow the token budget. */
 const MAX_PR_DESCRIPTION_CHARS = 4000;
 
@@ -106,7 +133,9 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
   if (prDescription) {
     userSections.push(`## PR description\n${wrapUntrusted('pr-description', prDescription)}`);
   }
-  if (skillsBlock) userSections.push(`## Skills / rules\n${skillsBlock}`);
+  if (skillsBlock) {
+    userSections.push(`## Skills / rules\n${SKILL_ATTRIBUTION_RULE}\n\n${skillsBlock}`);
+  }
   if (memoryBlock) userSections.push(`## Relevant memory\n${memoryBlock}`);
   if (parts.repoMap && parts.repoMap.trim().length > 0) {
     userSections.push(`## Repo skeleton\n${wrapUntrusted('repo-map', parts.repoMap)}`);

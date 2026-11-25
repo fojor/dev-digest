@@ -85,6 +85,20 @@
       "when": 1795557945345,
       "tag": "0011_fk_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795620262424,
+      "tag": "0012_skills_m2",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795633301380,
+      "tag": "0013_skills_phase2",
+      "breakpoints": true
     }
   ]
 }

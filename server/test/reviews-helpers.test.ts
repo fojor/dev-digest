@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { taskLine } from '../src/modules/reviews/application/helpers.js';
+import { attributeFindings, taskLine } from '../src/modules/reviews/application/helpers.js';
 
 /**
  * Unit coverage for the review task-line. The key invariant: our trusted
@@ -20,5 +20,14 @@ describe('taskLine', () => {
     const line = taskLine(pull);
     expect(line).toMatch(/never .*withhold .*(or downgrade )?.*security/i);
     expect(line).toMatch(/review the entire diff/i);
+  });
+});
+
+describe('attributeFindings', () => {
+  const f = (skill: string | null | undefined) =>
+    ({ id: 'x', severity: 'WARNING', category: 'bug', title: 't', file: 'a', start_line: 1, end_line: 1, rationale: 'r', confidence: 1, skill }) as never;
+  it('keeps only tags that name a skill from the run prompt', () => {
+    const out = attributeFindings([f('alpha'), f('ghost'), f(null), f(undefined), f('')], [{ id: 'id-a', name: 'alpha' }]);
+    expect(out.map((x) => x.skillId)).toEqual(['id-a', null, null, null, null]);
   });
 });

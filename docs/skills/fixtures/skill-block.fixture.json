@@ -1,0 +1,13 @@
+{
+  "comment": "Pins the prompt format of one skill block. reviewer-core renderSkillBlock and the client Preview helper must both turn each input into its expected string.",
+  "cases": [
+    {
+      "input": { "name": "flaky-tests", "description": "  Flag tests that depend on time or order.  ", "body": "\n- No sleeps\n- No shared state\n\n" },
+      "expected": "### Skill: flaky-tests\n_Flag tests that depend on time or order._\n\n- No sleeps\n- No shared state"
+    },
+    {
+      "input": { "name": "no-description", "description": "   ", "body": "Body only." },
+      "expected": "### Skill: no-description\n\nBody only."
+    }
+  ]
+}

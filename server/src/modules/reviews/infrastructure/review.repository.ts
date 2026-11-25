@@ -2,6 +2,7 @@ import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import type { Finding, Intent, RunSummary, RunTrace } from '@devdigest/shared';
 import type { ReviewsRepository } from '../domain/ports.js';
+import type { AttributedFinding, RunSkillRecord } from '../domain/types.js';
 
 /**
  * A2 — review data-access. The ONLY layer touching the DB for the review
@@ -57,7 +58,7 @@ export class ReviewRepository implements ReviewsRepository {
     return reviewRepo.insertReview(this.db, values);
   }
 
-  insertFindings(reviewId: string, findings: Finding[]): Promise<FindingRow[]> {
+  insertFindings(reviewId: string, findings: AttributedFinding[]): Promise<FindingRow[]> {
     return reviewRepo.insertFindings(this.db, reviewId, findings);
   }
 
@@ -184,5 +185,13 @@ export class ReviewRepository implements ReviewsRepository {
 
   getRunTrace(runId: string): Promise<RunTrace | undefined> {
     return runRepo.getRunTrace(this.db, runId);
+  }
+
+  async recordRunSkills(runId: string, skills: RunSkillRecord[]): Promise<void> {
+    if (skills.length === 0) return;
+    await this.db
+      .insert(t.runSkills)
+      .values(skills.map((s) => ({ runId, ...s })))
+      .onConflictDoNothing();
   }
 }

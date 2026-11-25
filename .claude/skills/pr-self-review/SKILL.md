@@ -2,6 +2,7 @@
 name: pr-self-review
 description: Reviews ALL local changes that are not on main yet (branch commits + staged + unstaged + untracked) before a pull request is opened — runs lint/typecheck/tests for the touched packages, then the repo's own skills on the files they cover (UI skills on client/, onion/backend skills on server/ + reviewer-core/), verifies every CRITICAL, and writes a PASS / BLOCK / INCOMPLETE verdict that the PR gate hook enforces. Use before `gh pr create`, before /ship, when the PR gate hook refuses a PR or a push, or when asked to self-review. Triggers - "self review", "pr self review", "review my changes before the PR", "is this ready for a PR", "/pr-self-review", "self-review перед PR", "перевір мої зміни", "чи можна відкривати PR".
 argument-hint: "[--base <ref>] | waive <F-id> <reason>"
+disable-model-invocation: true
 ---
 
 # pr-self-review

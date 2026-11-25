@@ -44,7 +44,12 @@ export function presentAgentVersion(v: AgentVersion): AgentVersionDto {
 }
 
 export function presentSkillLinks(agentId: string, links: SkillLink[]): AgentSkillLink[] {
-  return links.map((l) => ({ agent_id: agentId, skill_id: l.skillId, order: l.order }));
+  return links.map((l) => ({
+    agent_id: agentId,
+    skill_id: l.skillId,
+    order: l.order,
+    enabled: l.enabled,
+  }));
 }
 
 /** Request body → domain command. */

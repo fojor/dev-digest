@@ -31,13 +31,23 @@ export const UpdateAgentBody = CreateAgentBody.partial().extend({
 });
 export type UpdateAgentBody = z.infer<typeof UpdateAgentBody>;
 
-/** Either set the whole ordered set (`skill_ids`) or link one (`skill_id`). */
+/**
+ * Set the whole ordered set — `skills` (with per-agent enabled) or the legacy
+ * `skill_ids` (all enabled) — or link one (`skill_id`). Order = list index.
+ */
 export const SetSkillsBody = z
   .object({
+    skills: z
+      .array(z.object({ skill_id: z.string().uuid(), enabled: z.boolean() }))
+      .optional(),
     skill_ids: z.array(z.string().uuid()).optional(),
     skill_id: z.string().uuid().optional(),
     order: z.number().int().optional(),
   })
-  .refine((b) => b.skill_ids !== undefined || b.skill_id !== undefined, {
-    message: 'Provide skill_ids (set/reorder) or skill_id (link one)',
+  .refine(
+    (b) => b.skills !== undefined || b.skill_ids !== undefined || b.skill_id !== undefined,
+    { message: 'Provide skills / skill_ids (set/reorder) or skill_id (link one)' },
+  )
+  .refine((b) => new Set((b.skills ?? []).map((s) => s.skill_id)).size === (b.skills ?? []).length, {
+    message: 'Duplicate skill_id in skills',
   });

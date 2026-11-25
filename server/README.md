@@ -76,7 +76,8 @@ flowchart TB
     reviews["reviews<br/>/pulls/:id/review · /reviews · /findings/:id/(accept|dismiss)<br/>/runs/:id/(events|trace)"]
   end
   subgraph Agents["Agents"]
-    agents["agents<br/>/agents · /agents/:id"]
+    agents["agents<br/>/agents · /agents/:id · /agents/:id/skills"]
+    skills["skills<br/>/skills · /skills/:id · /skills/import/preview<br/>/skills/stats · /skills/:id/stats · /skills/:id/versions · /skills/tokens"]
   end
   subgraph Intel["Repo intelligence"]
     repoIntel["repo-intel<br/>/repos/:id/index-state · /resync"]
@@ -110,7 +111,8 @@ through `SecretsProvider` (`~/.devdigest/secrets.json`, mode `0600`, with
 
 Migrations are **not** applied on boot — run `pnpm db:migrate` (pgvector is
 enabled by migration `0000`). `pnpm db:seed` is idempotent demo data
-(`acme/payments-api`, PR #482, the two built-in agents).
+(`acme/payments-api`, PR #482, the built-in agents, the Test Quality Reviewer
+with its linked skills, and the M2 control-experiment PRs #501 / #502).
 
 ## Review context (non-obvious)
 
@@ -132,6 +134,22 @@ What the reviewer actually sends to the model is assembled in
   demo / test / not for production / do not flag" never descope the review — real
   defects are reported at full severity regardless. We deliberately do **not**
   keyword-scan untrusted text (a denylist only catches one phrasing).
+- **Skills are text appended to the prompt.** `run-agent.ts` loads the agent's
+  skills that are linked, enabled on the link (`agent_skills.enabled`) AND
+  enabled globally (`skills.enabled`), in link order, and passes each as a
+  `### Skill: <name>` block (description in italics, then the body) to the
+  `## Skills / rules` section. Nothing in a skill is executed; import reads only
+  `SKILL.md` from a `.zip` (in memory, `adapters/archive`) and stores nothing
+  until the user confirms with `POST /skills`. The trace's `prompt_assembly`
+  carries the block and `skills_tokens` (sum of the per-skill block counts, cl100k,
+  `adapters/tokenizer`). The block format is `renderSkillBlock` in reviewer-core
+  (shared with `POST /skills/tokens`, the editor's counter). Each run records the
+  skills its prompt contained in `run_skills` (version, position, tokens); the
+  model may tag a finding with `skill`, and the run keeps the tag as
+  `findings.skill_id` only when it names one of that run's skills. These feed
+  `GET /skills/stats` (cards) and `GET /skills/:id/stats` (30-day window). Content
+  edits, create, import and `POST /skills/:id/versions/:v/restore` append full
+  snapshots to `skill_versions` with a note and kind; history is append-only.
 - **Grounding is mandatory.** Every finding must cite a line that exists in the
   diff or it is dropped (`groundFindings`), and the score is recomputed from the
   surviving findings — the model's self-reported score is ignored.

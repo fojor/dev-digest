@@ -10,7 +10,14 @@ import type {
   AgentsUnitOfWork,
   ModelCatalogFor,
 } from '../domain/ports.js';
-import type { Agent, AgentPatch, AgentVersion, NewAgent, SkillLink } from '../domain/types.js';
+import type {
+  Agent,
+  AgentPatch,
+  AgentVersion,
+  NewAgent,
+  SkillLink,
+  SkillLinkInput,
+} from '../domain/types.js';
 
 export interface AgentsDeps {
   agents: AgentsRepository;
@@ -87,11 +94,14 @@ export class AgentsService {
     return this.d.agents.skillLinks(agentId);
   }
 
-  /** Replace the whole ordered skill set (delete + insert in one transaction). */
-  async setSkills(workspaceId: string, agentId: string, skillIds: string[]): Promise<SkillLink[]> {
+  /**
+   * Replace the whole ordered skill set (delete + insert in one transaction).
+   * Unchecked skills stay linked with `enabled: false` so they keep their place.
+   */
+  async setSkills(workspaceId: string, agentId: string, links: SkillLinkInput[]): Promise<SkillLink[]> {
     return this.d.uow.run(async ({ agents }) => {
       if (!(await agents.getById(workspaceId, agentId))) throw new AgentNotFound();
-      await agents.setSkills(agentId, skillIds);
+      await agents.setSkills(agentId, links);
       return agents.skillLinks(agentId);
     });
   }

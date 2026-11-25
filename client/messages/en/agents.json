@@ -97,5 +97,17 @@
   },
   "mount": {
     "body": "Mount point for {owner}. The Agent Editor shell + tab routing are wired by A2 — {owner} renders this tab."
+  },
+  "skillsTab": {
+    "title": "Skills",
+    "enabledCount": "{enabled} of {total} enabled",
+    "hint": "Order matters — earlier skills appear earlier in the assembled prompt. Drag to reorder (or Alt+↑ / Alt+↓).",
+    "filterPlaceholder": "Filter skills…",
+    "empty": "No skills yet. Create or import one on the Skills page.",
+    "goToSkills": "Open Skills",
+    "noMatch": "No skills match the filter.",
+    "dragHandle": "Drag to reorder {name}",
+    "loadError": "Could not load this agent's skills.",
+    "globallyOff": "off globally"
   }
 }

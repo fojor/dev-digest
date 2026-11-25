@@ -5,6 +5,7 @@ import pulls from './pulls/index.js';
 import polling from './polling/index.js';
 import workspace from './workspace/index.js';
 import agents from './agents/index.js';
+import skills from './skills/index.js';
 import reviews from './reviews/index.js';
 import repoIntel from './repo-intel/index.js';
 
@@ -29,6 +30,7 @@ export const modules: Record<string, FastifyPluginAsync> = {
   polling,
   workspace,
   agents,
+  skills,
   reviews,
   repoIntel,
 };

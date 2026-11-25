@@ -19,8 +19,11 @@ import type {
   PullRequest,
   RepoCoordinates,
   Review,
+  PromptSkill,
   ReviewAgent,
   ReviewFinding,
+  AttributedFinding,
+  RunSkillRecord,
 } from './types.js';
 
 /** Persistence port for reviews, findings, agent runs and their traces. */
@@ -34,7 +37,8 @@ export interface ReviewsRepository {
 
   // ---- reviews + findings ----
   insertReview(values: NewReview): Promise<Review>;
-  insertFindings(reviewId: string, findings: Finding[]): Promise<ReviewFinding[]>;
+  /** `skillId` on a finding = its validated skill attribution (absent/null → none). */
+  insertFindings(reviewId: string, findings: AttributedFinding[]): Promise<ReviewFinding[]>;
   /** Reviews for a PR (newest first), each with its findings. */
   reviewsForPull(prId: string): Promise<{ review: Review; findings: ReviewFinding[] }[]>;
   /** False if the review is not in the workspace. Findings cascade. */
@@ -59,6 +63,8 @@ export interface ReviewsRepository {
   /** Marks runs orphaned by a dead process as failed; returns how many. */
   reapStaleRunningRuns(): Promise<number>;
   saveRunTrace(runId: string, trace: RunTrace): Promise<void>;
+  /** Record the skills the run's prompt contained (one row each). No-op for []. */
+  recordRunSkills(runId: string, skills: RunSkillRecord[]): Promise<void>;
   getRunTrace(runId: string): Promise<RunTrace | undefined>;
 }
 
@@ -66,6 +72,14 @@ export interface ReviewsRepository {
 export interface AgentsReader {
   listEnabled(workspaceId: string): Promise<ReviewAgent[]>;
   getById(workspaceId: string, id: string): Promise<ReviewAgent | undefined>;
+}
+
+/**
+ * Skills port: the skills that reach an agent's prompt — linked, enabled on the
+ * link and globally, in link order (container.skillsRepo satisfies it).
+ */
+export interface AgentSkillsReader {
+  listEnabledForAgent(agentId: string): Promise<PromptSkill[]>;
 }
 
 /**
@@ -136,6 +150,9 @@ export interface ReviewRunDeps {
   llmFor: (provider: Provider) => Promise<LLMProvider>;
   repoIntel: ReviewContextSource;
   git: Pick<GitClient, 'diff'>;
+  skills: AgentSkillsReader;
+  /** Token count of a prompt fragment (tokenizer adapter) — for trace attribution. */
+  countTokens: (text: string) => number;
 }
 
 /** Built in platform/container.ts (`container.reviewService`). */

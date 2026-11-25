@@ -6,6 +6,7 @@ import type {
   AgentVersion,
   NewAgent,
   SkillLink,
+  SkillLinkInput,
 } from './types.js';
 
 /** Persistence port for agents, their version snapshots and skill links. */
@@ -30,8 +31,8 @@ export interface AgentsRepository {
   skillLinks(agentId: string): Promise<SkillLink[]>;
   /** Upsert one link's order. */
   linkSkill(agentId: string, skillId: string, order: number): Promise<void>;
-  /** Replace all links with `skillIds`, order = index. */
-  setSkills(agentId: string, skillIds: string[]): Promise<void>;
+  /** Replace all links with `links`, order = index. */
+  setSkills(agentId: string, links: SkillLinkInput[]): Promise<void>;
 }
 
 export type AgentsUnitOfWork = UnitOfWork<{ agents: AgentsRepository }>;

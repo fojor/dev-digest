@@ -28,6 +28,11 @@ import { ConfigError } from './errors.js';
 import type { AgentsRepository, AgentsUnitOfWork } from '../modules/agents/domain/ports.js';
 import { DrizzleAgentsRepository } from '../modules/agents/infrastructure/agents.repository.js';
 import { DrizzleAgentsUnitOfWork } from '../modules/agents/infrastructure/agents.uow.js';
+import type { SkillStatsReader, SkillsRepository, SkillsUnitOfWork } from '../modules/skills/domain/ports.js';
+import { DrizzleSkillsRepository } from '../modules/skills/infrastructure/skills.repository.js';
+import { DrizzleSkillsUnitOfWork } from '../modules/skills/infrastructure/skills.uow.js';
+import { DrizzleSkillStatsReader } from '../modules/skills/infrastructure/skills-stats.reader.js';
+import { type ArchiveReader, FflateArchiveReader } from '../adapters/archive/index.js';
 import { ReviewRepository } from '../modules/reviews/infrastructure/review.repository.js';
 import { ReviewService } from '../modules/reviews/application/service.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
@@ -78,6 +83,10 @@ export class Container {
   // `container.agentsRepo` instead of reaching into another module's folder.
   private _agentsRepo?: AgentsRepository;
   private _agentsUow?: AgentsUnitOfWork;
+  private _skillsRepo?: SkillsRepository;
+  private _skillsUow?: SkillsUnitOfWork;
+  private _archive?: ArchiveReader;
+  private _skillStats?: SkillStatsReader;
   private _reviewRepo?: ReviewRepository;
   private _reviewService?: ReviewService;
   private _repoIntelService?: RepoIntelService;
@@ -112,6 +121,25 @@ export class Container {
     return (this._agentsUow ??= new DrizzleAgentsUnitOfWork(this.db));
   }
 
+  /** Skills persistence port (also read by reviews to build the prompt). */
+  get skillsRepo(): SkillsRepository {
+    return (this._skillsRepo ??= new DrizzleSkillsRepository(this.db));
+  }
+
+  get skillsUow(): SkillsUnitOfWork {
+    return (this._skillsUow ??= new DrizzleSkillsUnitOfWork(this.db));
+  }
+
+  /** Read-only skill usage numbers (Skills page cards, Stats tab). */
+  get skillStats(): SkillStatsReader {
+    return (this._skillStats ??= new DrizzleSkillStatsReader(this.db));
+  }
+
+  /** In-memory zip reader for skill import (never extracts or executes). */
+  get archive(): ArchiveReader {
+    return (this._archive ??= new FflateArchiveReader());
+  }
+
   get reviewRepo(): ReviewRepository {
     return (this._reviewRepo ??= new ReviewRepository(this.db));
   }
@@ -132,6 +160,8 @@ export class Container {
       get git() {
         return c.git;
       },
+      skills: this.skillsRepo,
+      countTokens: (text) => this.tokenizer.count(text),
     });
     return this._reviewService;
   }

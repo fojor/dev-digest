@@ -9,6 +9,7 @@ import type {
   AgentVersion,
   NewAgent,
   SkillLink,
+  SkillLinkInput,
 } from '../domain/types.js';
 import { toAgent, toAgentVersion, toConfigJson } from './mappers.js';
 
@@ -120,7 +121,11 @@ export class DrizzleAgentsRepository implements AgentsRepository {
 
   async skillLinks(agentId: string): Promise<SkillLink[]> {
     const rows = await this.db
-      .select({ skillId: t.agentSkills.skillId, order: t.agentSkills.order })
+      .select({
+        skillId: t.agentSkills.skillId,
+        order: t.agentSkills.order,
+        enabled: t.agentSkills.enabled,
+      })
       .from(t.agentSkills)
       .innerJoin(t.skills, eq(t.agentSkills.skillId, t.skills.id))
       .where(eq(t.agentSkills.agentId, agentId))
@@ -138,11 +143,11 @@ export class DrizzleAgentsRepository implements AgentsRepository {
       });
   }
 
-  async setSkills(agentId: string, skillIds: string[]): Promise<void> {
+  async setSkills(agentId: string, links: SkillLinkInput[]): Promise<void> {
     await this.db.delete(t.agentSkills).where(eq(t.agentSkills.agentId, agentId));
-    if (skillIds.length === 0) return;
+    if (links.length === 0) return;
     await this.db
       .insert(t.agentSkills)
-      .values(skillIds.map((skillId, i) => ({ agentId, skillId, order: i })));
+      .values(links.map((l, i) => ({ agentId, skillId: l.skillId, enabled: l.enabled, order: i })));
   }
 }

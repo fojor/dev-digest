@@ -69,6 +69,26 @@ describe('reviewPullRequest (engine)', () => {
     expect(events.some((m) => m.includes('Citation grounding'))).toBe(true);
   });
 
+  it('keeps the model\'s skill tag through grounding (single-pass and map-reduce)', async () => {
+    const tagged = {
+      ...fixture,
+      findings: fixture.findings.map((f, i) => ({ ...f, skill: i === 0 ? 'secret-scan' : null })),
+    };
+    const diff = await new MockGitClient().diff();
+    for (const strategy of ['single-pass', 'map-reduce'] as const) {
+      const outcome = await reviewPullRequest({
+        systemPrompt: 'security reviewer',
+        model: 'gpt-4.1',
+        diff,
+        llm: new MockLLMProvider('openai', { structured: tagged }),
+        strategy,
+        task: 'Review PR #482',
+      });
+      expect(outcome.review.findings.length).toBeGreaterThan(0);
+      for (const f of outcome.review.findings) expect(f.skill).toBe('secret-scan');
+    }
+  });
+
   it('score is deterministic from findings: a clean approve scores 100', async () => {
     // Model "approves" but reports a nonsense low score (the cheap-model bug).
     // The engine must ignore that and score the zero findings as a perfect 100.

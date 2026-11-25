@@ -77,8 +77,15 @@ export interface AgentVersion {
   createdAt: Date;
 }
 
-/** A skill linked to an agent, with its position. */
+/** A skill linked to an agent, with its position and per-agent switch. */
 export interface SkillLink {
   skillId: string;
   order: number;
+  enabled: boolean;
+}
+
+/** One entry of an ordered skill set; the position comes from the list index. */
+export interface SkillLinkInput {
+  skillId: string;
+  enabled: boolean;
 }

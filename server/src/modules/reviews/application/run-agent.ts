@@ -3,13 +3,16 @@ import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
 import type { ReviewRunDeps, RunLog } from '../domain/ports.js';
 import type { PullRequest, RepoCoordinates, ReviewAgent } from '../domain/types.js';
 import { REVIEW_STRATEGY } from './constants.js';
-import { taskLine } from './helpers.js';
+import { attributeFindings, renderSkillBlock, taskLine } from './helpers.js';
 import { RunCancelledError, type RunOutcome } from './run-types.js';
 import { buildCallersDigest, buildRankNote, buildRepoMapDigest } from './run-context.js';
 import { buildRunTrace, runCost, traceFromBuffer } from './run-trace.js';
 
 /** The deps a single agent run uses (no git: the diff is loaded once upstream). */
-export type AgentRunDeps = Pick<ReviewRunDeps, 'repo' | 'runBus' | 'llmFor' | 'repoIntel'>;
+export type AgentRunDeps = Pick<
+  ReviewRunDeps,
+  'repo' | 'runBus' | 'llmFor' | 'repoIntel' | 'skills' | 'countTokens'
+>;
 
 /**
  * Execute a single agent's review against a PR, streaming progress. Persists
@@ -68,6 +71,26 @@ export async function runOneAgent(
 
     const task = taskLine(pull) + rankNote;
 
+    // M2 — the agent's skills (linked + enabled on the link + enabled
+    // globally, in link order) become the prompt's "Skills / rules" section.
+    // A disabled skill never reaches the prompt or the trace.
+    const skills = await d.skills.listEnabledForAgent(agent.id);
+    if (skills.length > 0) {
+      runLog.info(`Loaded ${skills.length} skill(s): ${skills.map((s) => s.name).join(', ')}`, {
+        skills: skills.map((s) => s.name),
+      });
+    } else {
+      runLog.info('No enabled skills for this agent');
+    }
+    // M2 Phase 2 — record what the prompt contains right away (the run row
+    // exists), so failed/cancelled runs count toward pull frequency too.
+    const skillBlocks = skills.map(renderSkillBlock);
+    const skillTokens = skillBlocks.map((b) => d.countTokens(b));
+    await d.repo.recordRunSkills(
+      runId,
+      skills.map((s, i) => ({ skillId: s.id, skillVersion: s.version, position: i, tokens: skillTokens[i]! })),
+    );
+
     // ---- Engine: assemble → single-pass → grounding -----------------------
     // The pure review pipeline lives in @devdigest/reviewer-core (shared with
     // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -80,6 +103,7 @@ export async function runOneAgent(
       // Per-agent review strategy (configured in the Agent editor); falls back
       // to the studio default. single-pass = whole diff in one call.
       strategy: agent.strategy ?? REVIEW_STRATEGY,
+      ...(skills.length > 0 ? { skills: skillBlocks } : {}),
       // T1.3 — pass the callers digest only when we built one. assemblePrompt
       // omits the section when this is empty/undefined.
       ...(callersDigest ? { callers: callersDigest } : {}),
@@ -117,7 +141,7 @@ export async function runOneAgent(
       score: outcome.review.score,
       model: agent.model,
     });
-    const findingRows = await d.repo.insertFindings(review.id, keptFindings);
+    const findingRows = await d.repo.insertFindings(review.id, attributeFindings(keptFindings, skills));
     runLog.result(`Persisted review ${review.id} with ${findingRows.length} finding(s)`);
 
     // Mark the commit this review ran against so the PR list can tell
@@ -144,7 +168,11 @@ export async function runOneAgent(
       error: null,
     });
 
+    // Tokens the skills add to the prompt (shown in the trace's prompt-assembly
+    // section): the sum of the per-skill blocks recorded in run_skills, so it
+    // matches the skill editor's counter.
     const trace = buildRunTrace(pull, agent, runId, runLog, outcome, {
+      skillsTokens: skillTokens.length > 0 ? skillTokens.reduce((a, b) => a + b, 0) : null,
       durationMs,
       tokensIn,
       tokensOut,

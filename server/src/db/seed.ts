@@ -6,7 +6,10 @@ import {
   GENERAL_REVIEWER_PROMPT,
   SECURITY_REVIEWER_PROMPT,
   PERFORMANCE_REVIEWER_PROMPT,
+  TEST_QUALITY_REVIEWER_PROMPT,
 } from './seed-prompts.js';
+import { TEST_QUALITY_SKILLS } from './seed-skills.js';
+import { EXPERIMENT_PRS } from './seed-experiment.js';
 
 /** Default provider/model for the built-in reviewer agents. */
 const DEFAULT_PROVIDER = 'openrouter' as const;
@@ -21,8 +24,11 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
  * with a few findings, and the three built-in agents (General + Security +
  * Performance), all on the default openrouter/deepseek-v4-flash provider+model.
  *
- * Later milestones populate the other tables (skills, conventions, memory, eval,
- * …) once their features are built — they start empty here.
+ * M2 adds the Test Quality Reviewer with its linked skills (seed-skills.ts) and
+ * the two control-experiment PRs #501 / #502 (seed-experiment.ts).
+ *
+ * Later milestones populate the other tables (conventions, memory, eval, …)
+ * once their features are built — they start empty here.
  */
 
 export const DEFAULT_WORKSPACE_NAME = 'default';
@@ -202,6 +208,18 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
     },
     {
       workspaceId,
+      name: 'Test Quality Reviewer',
+      description:
+        'Checks test quality: untested branches, missing corner cases, over-mocking and flaky tests.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: TEST_QUALITY_REVIEWER_PROMPT,
+      enabled: true,
+      version: 1,
+      createdBy: userId,
+    },
+    {
+      workspaceId,
       name: 'Performance Reviewer',
       description: 'Catches N+1 queries, missing indexes, and hot-path allocations.',
       provider: DEFAULT_PROVIDER,
@@ -218,6 +236,65 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       .from(t.agents)
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, a.name)));
     if (!existing) await db.insert(t.agents).values(a);
+  }
+
+  // ---- M2: Test Quality skills, linked to the Test Quality Reviewer in order ----
+  const skillIds: string[] = [];
+  for (const s of TEST_QUALITY_SKILLS) {
+    let [skill] = await db
+      .select()
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, s.name)));
+    if (!skill) {
+      [skill] = await db
+        .insert(t.skills)
+        .values({ workspaceId, ...s, source: 'manual', version: 1 })
+        .returning();
+      await db.insert(t.skillVersions).values({ skillId: skill!.id, version: 1, body: s.body });
+    }
+    skillIds.push(skill!.id);
+  }
+  const [testQuality] = await db
+    .select()
+    .from(t.agents)
+    .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, 'Test Quality Reviewer')));
+  const existingLinks = await db
+    .select()
+    .from(t.agentSkills)
+    .where(eq(t.agentSkills.agentId, testQuality!.id));
+  // Only on a fresh agent: never overwrite links the user has changed.
+  if (existingLinks.length === 0) {
+    await db
+      .insert(t.agentSkills)
+      .values(skillIds.map((skillId, order) => ({ agentId: testQuality!.id, skillId, order })));
+  }
+
+  // ---- M2: control-experiment PRs (diffs from pr_files patches) ----
+  for (const p of EXPERIMENT_PRS) {
+    const [existingPr] = await db
+      .select()
+      .from(t.pullRequests)
+      .where(and(eq(t.pullRequests.repoId, repoId), eq(t.pullRequests.number, p.number)));
+    if (existingPr) continue;
+    const [created] = await db
+      .insert(t.pullRequests)
+      .values({
+        workspaceId,
+        repoId,
+        number: p.number,
+        title: p.title,
+        author: p.author,
+        branch: p.branch,
+        base: 'main',
+        headSha: p.headSha,
+        additions: p.files.reduce((n, f) => n + f.additions, 0),
+        deletions: p.files.reduce((n, f) => n + f.deletions, 0),
+        filesCount: p.files.length,
+        status: 'needs_review',
+        body: p.body,
+      })
+      .returning();
+    await db.insert(t.prFiles).values(p.files.map((f) => ({ prId: created!.id, ...f })));
   }
 
   return { workspaceId, userId };

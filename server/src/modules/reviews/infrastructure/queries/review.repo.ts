@@ -29,7 +29,7 @@ export async function insertReview(
 export async function insertFindings(
   db: Db,
   reviewId: string,
-  findings: Finding[],
+  findings: (Finding & { skillId?: string | null })[],
 ): Promise<FindingRow[]> {
   if (findings.length === 0) return [];
   const rows = await db
@@ -48,6 +48,7 @@ export async function insertFindings(
         confidence: f.confidence,
         kind: f.kind ?? 'finding',
         trifectaComponents: f.trifecta_components ?? null,
+        skillId: f.skillId ?? null,
       })),
     )
     .returning();

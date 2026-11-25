@@ -115,7 +115,7 @@ export type MemoryItem = z.infer<typeof MemoryItem>;
 export const SkillType = z.enum(['rubric', 'convention', 'security', 'custom']);
 export type SkillType = z.infer<typeof SkillType>;
 
-export const SkillSource = z.enum(['manual', 'imported_url', 'extracted', 'community']);
+export const SkillSource = z.enum(['manual', 'imported', 'imported_url', 'extracted', 'community']);
 export type SkillSource = z.infer<typeof SkillSource>;
 
 export const Skill = z.object({
@@ -130,6 +130,98 @@ export const Skill = z.object({
   evidence_files: z.array(z.string()).nullish(),
 });
 export type Skill = z.infer<typeof Skill>;
+
+/**
+ * Result of parsing an uploaded skill (.md or .zip) — nothing is stored yet.
+ * The user reviews it and confirms with a regular create (source 'imported').
+ * `ignored_files` lists every archive entry that was NOT read (scripts,
+ * binaries, extra docs); `executable` marks the ones that look runnable.
+ */
+export const SkillImportIgnoredFile = z.object({
+  path: z.string(),
+  executable: z.boolean(),
+});
+export type SkillImportIgnoredFile = z.infer<typeof SkillImportIgnoredFile>;
+
+export const SkillImportPreview = z.object({
+  name: z.string(),
+  description: z.string(),
+  type: SkillType,
+  body: z.string(),
+  /** File the core was taken from (e.g. "SKILL.md" or "my-skill/SKILL.md"). */
+  source_file: z.string(),
+  ignored_files: z.array(SkillImportIgnoredFile),
+  warnings: z.array(z.string()),
+});
+export type SkillImportPreview = z.infer<typeof SkillImportPreview>;
+
+/** How a skill version came to be (null on Phase 1 rows, which stored only the body). */
+export const SkillVersionKind = z.enum(['create', 'edit', 'import', 'restore']);
+export type SkillVersionKind = z.infer<typeof SkillVersionKind>;
+
+/**
+ * One immutable snapshot from a skill's history (newest first in the API).
+ * name / description / type / note / kind are null on rows written before
+ * full snapshots existed — the UI falls back to the current skill's fields.
+ */
+export const SkillVersion = z.object({
+  version: z.number().int(),
+  name: z.string().nullish(),
+  description: z.string().nullish(),
+  type: SkillType.nullish(),
+  body: z.string(),
+  note: z.string().nullish(),
+  kind: SkillVersionKind.nullish(),
+  created_at: z.string(),
+  /** True for the skill's current version. */
+  current: z.boolean(),
+});
+export type SkillVersion = z.infer<typeof SkillVersion>;
+
+/**
+ * Per-card numbers for the Skills page (one batch call). Rates are 0..1;
+ * null = no data in the window (rendered "—").
+ */
+export const SkillStatsSummary = z.object({
+  skill_id: z.string(),
+  /** Agents with an ENABLED link to the skill, now. */
+  used_by: z.number().int(),
+  /** Runs whose prompt contained the skill ÷ finished runs of agents linking it (window). */
+  pull_rate: z.number().min(0).max(1).nullable(),
+  /** accepted ÷ (accepted + dismissed) over findings attributed to the skill (window). */
+  accept_rate: z.number().min(0).max(1).nullable(),
+});
+export type SkillStatsSummary = z.infer<typeof SkillStatsSummary>;
+
+export const SkillStatsAgent = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+export type SkillStatsAgent = z.infer<typeof SkillStatsAgent>;
+
+export const SkillCategoryCount = z.object({
+  category: z.string(),
+  count: z.number().int(),
+});
+export type SkillCategoryCount = z.infer<typeof SkillCategoryCount>;
+
+/** The skill panel's Stats tab. Every time-based number covers `window_days`. */
+export const SkillStats = SkillStatsSummary.extend({
+  window_days: z.number().int(),
+  /** Findings attributed to the skill in the window. */
+  findings: z.number().int(),
+  /** The pull-rate fraction behind `pull_rate`. */
+  runs_with_skill: z.number().int(),
+  runs_total: z.number().int(),
+  /** The `used_by` agents. */
+  agents: z.array(SkillStatsAgent),
+  /** Attributed findings per category, non-zero only. */
+  categories: z.array(SkillCategoryCount),
+});
+export type SkillStats = z.infer<typeof SkillStats>;
+
+export const SkillTokens = z.object({ tokens: z.number().int() });
+export type SkillTokens = z.infer<typeof SkillTokens>;
 
 export const CommunitySkill = z.object({
   name: z.string(),
@@ -195,6 +287,8 @@ export const AgentSkillLink = z.object({
   agent_id: z.string(),
   skill_id: z.string(),
   order: z.number().int(),
+  /** Per-agent switch; a disabled link keeps its position but skips the prompt. */
+  enabled: z.boolean(),
 });
 export type AgentSkillLink = z.infer<typeof AgentSkillLink>;
 
