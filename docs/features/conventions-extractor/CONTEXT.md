@@ -35,16 +35,21 @@ this feature and win over looser wording elsewhere in its documents.
 - **Re-scan** — an extraction run on a repo that already has candidates. It replaces the pending
   candidates and keeps the accepted and rejected ones.
 - **Sample files** — the most important source files of a repo by importance rank (tests,
-  configs and migrations excluded), as reported by the repo's code index.
+  configs and migrations excluded; equal ranks ordered by path), as reported by the repo's code
+  index.
 - **Style configs** — a fixed allow-list of style/tooling configuration files (lint, compiler,
-  formatter, editor settings) read from the repo root.
+  formatter, editor settings) read from the repo root only. They are analysed in a run and can
+  serve as evidence, but are not counted as sample files.
 - **Code index** — DevDigest's per-repo index of files, symbols and importance rank. A repo with
   no index has no sample files.
 - **Conventions model** — the provider + model chosen for the «Conventions» feature in Settings
   (feature models).
 - **Conventions skill** — a skill of type *convention* and source *extracted*, assembled from the
   accepted candidates of a repo. Default name `repo-conventions`; created disabled. It is
-  identified by its name + source: saving again with the same name updates it as a new version.
+  identified by its name + source: saving again with the same name (ignoring case and surrounding
+  spaces) updates it as a new version; if several extracted skills share the name, the most
+  recently updated one is updated. A manual or imported skill with the same name never blocks
+  or receives this update.
   Like any skill, it applies wherever it is linked (not limited to its repo).
 - **Skill** — a reusable markdown rule block linked to reviewer agents and added to their prompt
   as instructions (see `docs/features/skills/spec.md`).
