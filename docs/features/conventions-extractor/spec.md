@@ -391,3 +391,147 @@ local-first; there is no product analytics). Baseline 0 — new feature.
 Resolved by design 2026-11-26: the three ticked questions above, as their stated defaults — see [sad.md](./sad.md) §4, §5, §8 and ADR-0002.
 
 Resolved 2026-11-25 (owner): conventions skills are not limited to their repo (§3); the minimum evidence is one complete non-blank line (AC-05); hand edits in Skills Lab are overwritten on the next save and kept in history (AC-19).
+
+## Test plan
+
+> Size S, route quick → inline plan (no separate test-plan.md). Every §5 AC maps to ≥ 1 test at
+> the level the owner confirmed (2026-11-26); `implement` writes each test at that level and picks
+> the runner from what the repo already uses (see TESTING.md). The Task column points at the
+> [tasks.json](./tasks.json) task whose DoD owns the test.
+
+### Levels
+
+| Level | Scope here | Strategy (generic) |
+|---|---|---|
+| Unit | Pure domain rules (normalise, verify evidence, secret filter, dedupe, limits, sample ranking) and the client draft helpers | In-memory, no I/O; the model is never involved |
+| Integration | The conventions service, repository and routes, and the extended skills API, against the real database they own | A throwaway database container per suite, migrated and seeded; the model is the repo's stubbed provider, never a live call |
+| Contract | The conventions route responses and refusals, and the shared candidate / skill shapes | Real responses validated against `contracts/openapi.yaml` and the vendored shared contracts (both copies byte-identical) |
+| Component | SCR-01 page, CandidateCard, EvidenceSnippet, SCR-02 and SCR-03 states from screens.md | Rendered in isolation with a stubbed network layer; assert visible output, interactions and the requests sent |
+| E2E-through-UI | — | <!-- N/A: owner decision 2026-11-26 — no browser journey for this feature; see CI placement for the T14 note --> |
+| Visual-regression | — | <!-- N/A: the repo has no visual-baseline tooling; card and modal states are asserted by component tests --> |
+| Load | Numeric §6 latency NFRs | See NFR validation below |
+
+### AC coverage
+
+| AC (spec.md §5) | Test name (intent-based) | Level | Expected outcome | Task |
+|---|---|---|---|---|
+| AC-01 run extraction | extraction run stores verified candidates as pending | integration | candidates stored as pending, scan facts recorded, exactly one model call to the model chosen in Settings, run log names that model | T8 |
+| AC-01 | extraction result matches the contract | contract | the extract response carries scan facts, the full candidate list and the new-candidate count in the agreed shape | T10 |
+| AC-01 | page shows scanning then the candidate list | component | controls disabled with «Scanning…» while the run is in flight, then pending cards render | T11 |
+| AC-02 repo not ready | run is blocked for every not-ready index state before any model call | integration | for not built, building, failed, turned off, and all files excluded: run refused with the matching reason, zero model calls, nothing stored | T8 |
+| AC-02 | not-indexed refusal matches the contract | contract | the refusal carries the agreed error shape and reason | T10 |
+| AC-02 | blocked run shows the reason | component | banner says the repo must be indexed first or has no source files to analyse | T11 |
+| AC-03 model failure | a failed model call leaves the repo as it was | integration | for unavailable, no credentials, over 120 s, unreadable answer: nothing stored, previous candidates and last successful scan record kept, repo no longer scanning; after an app restart mid-run the repo is not scanning | T8 |
+| AC-03 | model failures map to a plain-language reason | unit | timeout after 120 s, missing credentials and an unreadable answer each become a distinct readable reason | T6 |
+| AC-03 | failed run shows the reason and keeps the list | component | error banner with the reason above the unchanged list (or inside the empty state) | T11 |
+| AC-03b partly invalid | out-of-limit fields are cut or clamped and incomplete candidates dropped | unit | rule cut to 1000, category cut to 40, confidence clamped to 0–100 %, a candidate missing a required field discarded | T3 |
+| AC-03b | partly invalid answer still stores the valid rest | integration | remaining candidates verified and stored; the run log counts the discarded ones; only a non-list answer fails the run | T8 |
+| AC-04 one run per repo | a second concurrent run for the same repo is refused | integration | the second run is refused with «scan already running»; the first completes normally | T8 |
+| AC-04 | concurrent-run refusal is shown | component | banner says a scan is already running | T11 |
+| AC-04b read-only while scanning | candidate changes are refused while a scan runs | integration | accept, reject and edit refused with «scan in progress»; the list can still be read; changes work again after the run ends | T8, T10 |
+| AC-04b | cards and Create skill are read-only while scanning | component | Accept / Reject / edit disabled, Create skill disabled, and the modal refuses to open when the refetch shows scanning | T12, T13 |
+| AC-05 evidence verified | unverifiable evidence is discarded | unit | discarded when the path is outside the analysed set or escapes the repo, the file is missing, the fragment is absent, or it is shorter than one full non-blank line; whitespace and line-ending differences ignored; line range = first occurrence | T3 |
+| AC-05 | only verified candidates are stored, with their line range | integration | every stored candidate has evidence present in its analysed file and a recorded line range | T8 |
+| AC-06 header and cards | candidate list matches the contract | contract | list response carries scan facts, scanning flag and candidates with status, category, evidence path, line range, fragment, confidence | T10 |
+| AC-06 | header and cards show every field | component | full repo name, sample-file count without style configs, «X ago», «N of M accepted»; each card shows rule, category, status, file:lines, fragment, confidence % with a bar | T11, T12 |
+| AC-07 empty states | a re-scan with no new candidates keeps earlier decisions | integration | accepted and rejected candidates unchanged, new-candidate count is zero | T8 |
+| AC-07 | empty and no-new states render | component | never-scanned empty state, none-verified variant, and the «no new conventions» notice over a kept list | T11 |
+| AC-08 other workspace | every conventions action on another workspace's repo or candidate behaves as non-existent | integration | list, extract and change each answer «not found» and reveal no rule, fragment or path | T8, T10 |
+| AC-08 | foreign repo shows the not-found screen | component | the shared repo-not-found view renders, no candidate data | T11 |
+| AC-09 accept | accepted status persists | integration | pending→accepted and rejected→accepted stored; re-read returns accepted | T5 |
+| AC-09 | accepted candidate enters the draft | unit | the draft builder includes accepted candidates | T9 |
+| AC-09 | accepted card is highlighted and counted | component | accent border, «Accepted» badge, accepted count goes up | T12 |
+| AC-10 reject | rejected status persists | integration | pending→rejected and accepted→rejected stored; re-read returns rejected | T5 |
+| AC-10 | rejected candidate is excluded from the draft | unit | the draft builder skips rejected (and pending) candidates | T9 |
+| AC-10 | rejected card stays dimmed in the list | component | card stays, dimmed, «Rejected» badge, accepted count updates | T12 |
+| AC-11 edit rule | editing the rule changes only the rule text | integration | new rule stored; original rule, evidence, category, confidence and status unchanged; evidence, category and confidence cannot be changed through the API | T5, T10 |
+| AC-11 | inline edit saves and shows the new text | component | edit mode with counter, save shows the new text, other fields untouched | T12 |
+| AC-12 invalid rule | an empty or over-long rule is refused | contract | empty text and text over 1000 characters are rejected by the agreed schema; stored text unchanged | T10 |
+| AC-12 | invalid rule shows the limit and keeps the old text | component | field error «between 1 character and the limit», previous text kept | T12 |
+| AC-13 decisions survive re-scan | repeats of decided rules are discarded | unit | a new candidate equal to the current or original text of an accepted or rejected candidate (ignoring case and whitespace) is dropped; both texts are in the do-not-repeat list | T4 |
+| AC-13 | re-scan replaces only pending candidates in one transaction | integration | accepted and rejected rows (incl. edited text) unchanged; pending rows, incl. edited pending, replaced; a failure mid-store leaves the previous state | T5 |
+| AC-14 confirm re-scan | re-scan asks before replacing pending candidates | component | dialog states N pending and M with edited text; cancel changes nothing; with no pending the run starts without the dialog | T11 |
+| AC-15 draft pre-filled | draft body is assembled by the rules | unit | heading with the skill name, flag-and-cite instruction, categories merged ignoring case and spacing and sorted A–Z, rules by confidence descending with file and line range; default name and description | T9 |
+| AC-15 | modal opens pre-filled | component | subtitle with N and the repo, name, description, enabled off with the review hint, drafted body | T13 |
+| AC-16 nothing accepted | Create skill is unavailable with no accepted candidates | component | action disabled with «accept at least one candidate first» | T13 |
+| AC-17 invalid draft | invalid modal fields block the save | component | empty name / description / body, non-slug name, or over-limit values: save blocked, the field shows its rule, other input kept | T13 |
+| AC-18 create | extracted skill is created through the skills API | integration | new skill of type convention, source extracted, version 1, chosen enabled state and evidence files; existing skills tests stay green | T7 |
+| AC-18 | saving a new skill confirms where to find it | component | modal closes, «find it in Skills Lab» notice with a link; the create request carries type, source and enabled state | T13 |
+| AC-19 update existing | the matching extracted skill is found by name | unit | match ignores case and surrounding spaces, an extracted skill wins over manual or imported, the most recently updated wins among several | T9 |
+| AC-19 | updating keeps history and agent links | integration | new version replaces name, description and body; previous content in history; agent links kept; list exposes the last update time | T7 |
+| AC-19 | update mode warns and starts from the current enabled state | component | warning names the next version; enabled switch starts from the existing skill's state; saved state is what the switch shows | T13 |
+| AC-20 no overwrite of other skills | a manual or imported name match blocks the save | unit | with no extracted match, a manual or imported match returns «blocked» | T9 |
+| AC-20 | blocked name is marked on the field | component | Name field error asking for another name; no create or update request sent | T13 |
+| AC-21 discard | closing the modal changes nothing | component | cancel, close and backdrop send no write request; candidates unchanged | T13 |
+| AC-22 apply in reviews | an enabled, linked conventions skill reaches the review prompt | integration | the skill's rules appear in the agent's skills block of the run's prompt assembly; absent while the skill is disabled | T15 |
+| AC-23 trust warning | the modal always shows the trust warning | component | warning about repository-derived rules becoming agent instructions, in create and update modes | T13 |
+| AC-24 no secrets | credential-bearing candidates are discarded | unit | a credential pattern in rule, category or fragment drops the candidate; the copied pattern list stays in sync with the pre-PR self-review list (fake keys built at test time) | T4 |
+| AC-24 | only allow-listed style configs are read | integration | on a seeded clone with environment, package-manager auth and CI files, none of them is read or sent; no credential is stored with any candidate | T6, T8 |
+
+### Edge cases / error paths
+
+Every error and authorization AC (AC-02, AC-03, AC-03b, AC-04, AC-04b, AC-08, AC-12, AC-16,
+AC-17, AC-20, AC-24) already has its own row above. The boundary and failure cases below come
+from §6 and §6.1 and are not owned by a single AC.
+
+| Case | Test name (intent-based) | Level | Expected outcome | Task |
+|---|---|---|---|---|
+| Model proposes more than 20 candidates | only the 20 most confident candidates are kept | unit | the lowest-confidence candidates are discarded first until 20 remain; proposed and stored counts are both reported | T4 |
+| Input over the size budget | oversized input is trimmed from the bottom of the ranking | unit | at most 12 sample files, each cut to 400 lines; while over 40 000 tokens the lowest-ranked sample files are dropped whole; the do-not-repeat list is never trimmed | T6 |
+| Same repo state, two runs | sample selection is deterministic | unit | identical sample set both times; files of equal importance are ordered by path | T6 |
+| Exactly one model call | a run makes exactly one model call | integration | the model call counter is 1 after a successful run and after each failed run in AC-03 | T8 |
+| Field limits at the boundary | rule and category limits accept the edge and refuse one past it | contract | a 1000-character rule and a 40-character category are accepted; 1001 and 41 characters are refused; an empty value is refused | T10 |
+| Shortest valid evidence | a single complete non-blank line is enough evidence | unit | a one-line fragment is kept; a whitespace-only or partial-line fragment is discarded | T3 |
+| Unknown candidate in own workspace | changing a candidate that does not exist is refused as not found | integration | not found, nothing changed | T10 |
+| Repo removed | removing a repo removes its candidates | integration | the repo's candidates are gone; other repos' candidates are untouched | T5 |
+| Existing rows before this feature | legacy accepted flags map to the new status | integration | previously accepted rows read as accepted, the rest as pending; the original rule equals the rule for every legacy row | T1 |
+| Run observability | every run writes one run-log line | integration | the line names the model and carries proposed, discarded and stored counts and the duration, for successful and failed runs | T8 |
+
+### Test data
+
+- **Integration dependency:** a throwaway database container per suite, started by the repo's
+  existing integration helper, migrated with the live migrations (including the promoted
+  conventions migrations). The datastore is never mocked; only the external model is replaced.
+- **Seed strategy:** factories matching [data-model.md](./data-model.md) — a workspace, a repo
+  in each index state (built, building, failed, turned off, all files excluded), conventions rows
+  in every status including edited ones (current rule differs from the original rule), and skills
+  of source extracted / manual / imported sharing a name for AC-19 and AC-20. A second workspace
+  is seeded for AC-08.
+- **Clone fixture:** a small on-disk repo with sample source files, one allow-listed style
+  config, and an environment file, a package-manager auth file and a CI file whose fake
+  credentials are built at test time (never committed as literal secrets) — for AC-05 and AC-24.
+- **Model:** the repo's deterministic mock model adapter with scripted answers — a valid list, a
+  partly invalid list, more than 20 candidates, a non-list answer, a timeout, missing
+  credentials — and a call counter.
+- **Cleanup boundary:** per suite for the container (stopped after all tests); per test for data
+  (each test seeds its own workspace with fresh ids, so tests never see each other's rows) and for
+  the clone fixture (copied into a per-test temporary folder and removed afterwards). Component
+  tests stub the network layer per test and start each test with an empty query cache.
+
+### NFR validation (load)
+
+The app is local and single-user, so each scenario is a timed run against a locally started
+server with a seeded database, using the load tool already in the repo, or e.g. k6 / Locust.
+
+- **Extraction run duration p95 ≤ 90 s** → 20 sequential runs (one at a time, since only one run
+  per repo is allowed) on a seeded repo with the default conventions model from Settings; assert
+  the p95 of the run-log duration ≤ 90 s and no failed runs. Needs a real model key, so it runs
+  manually before release, never in CI.
+- **Candidate list load p95 ≤ 300 ms for ≤ 50 candidates** → a repo seeded with 50 candidates;
+  5 list requests per second for 60 s; assert p95 ≤ 300 ms and zero errors.
+- **Accept / reject / edit p95 ≤ 300 ms** → the same seeded repo, a mix of accept, reject and
+  rule-edit requests at 5 per second for 60 s with no scan running; assert p95 ≤ 300 ms and zero
+  errors.
+
+### CI placement
+
+- **On every PR (required gate):** unit and component suites, contract checks (route responses
+  against `contracts/openapi.yaml`, and the two vendored contract copies byte-identical).
+- **On PRs that touch the server (path-filtered, not required):** the integration suite; it
+  skips cleanly when no container runtime is available, so run it locally before the PR.
+- **Before release, manually:** the three load scenarios above.
+- **T14:** [tasks.json](./tasks.json) still plans an e2e flow (T14), but the owner decided on
+  2026-11-26 that this feature has no browser journey (E2E-through-UI is N/A). Resolution
+  (owner, 2026-11-26): T14 is out of scope for this plan and should be removed from the task
+  breakdown. Its ACs (AC-01, AC-09, AC-15, AC-18) are covered above by integration, contract,
+  unit and component rows owned by T7–T13.
