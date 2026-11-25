@@ -170,7 +170,7 @@
         "server/test/conventions-service.test.ts"
       ],
       "file": "docs/features/conventions-extractor/tasks/t08-conventions-service.md",
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "T9",
