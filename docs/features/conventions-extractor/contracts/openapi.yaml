@@ -1,0 +1,457 @@
+openapi: 3.1.0
+info:
+  title: DevDigest — Conventions Extractor
+  version: 0.1.0
+  description: >
+    Lets the Developer turn a repo's unwritten coding conventions into a reviewable list of
+    candidates — each backed by verified evidence from the code — and curate them (accept, reject,
+    edit) before assembling a `convention` skill. Derived from spec.md §4–§6, sad.md §6 flows 1–8
+    and data-model.md; see api-sync-report.md for field origins. Repo conventions followed:
+    local no-auth provider (workspace resolved server-side), error envelope
+    `{ error: { code, message, details? } }` with flat snake_case codes, plain arrays for lists.
+servers:
+  - url: http://localhost:3001
+    description: Local DevDigest API
+# The repo runs a local no-auth provider (adapters/auth/local.ts): the workspace is resolved on
+# the server for every request; no credentials are sent. Hence no securitySchemes here.
+security: []
+
+tags:
+  - name: conventions
+  - name: skills
+    description: Existing skills routes — only the deltas this feature needs are described.
+
+paths:
+  /repos/{repoId}/conventions:
+    get:
+      tags: [conventions]
+      operationId: listConventions
+      summary: List a repo's candidates with scan facts and scanning state
+      description: Flow 3. AC-06, AC-07, AC-08, AC-04b (scanning flag).
+      parameters:
+        - $ref: '#/components/parameters/RepoId'
+      responses:
+        '200':
+          description: Candidates of the repo (empty list when never scanned)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConventionList'
+              examples:
+                withCandidates:
+                  $ref: '#/components/examples/ConventionListExample'
+                neverScanned:
+                  value: { scan: null, scanning: false, candidates: [] }
+        '404':
+          $ref: '#/components/responses/RepoNotFound'
+
+  /repos/{repoId}/conventions/extract:
+    post:
+      tags: [conventions]
+      operationId: extractConventions
+      summary: Run an extraction (first scan or re-scan) and return the refreshed list
+      description: >
+        Flows 1, 5, 6. Synchronous (ADR-0003): one model call, aborted after 120 s. On success,
+        pending candidates are replaced in one transaction; accepted and rejected stay; scan facts
+        are updated. On any failure nothing is stored. AC-01, AC-02, AC-03, AC-03b, AC-04, AC-05,
+        AC-07, AC-13, AC-24. The re-scan confirmation (AC-14) is a client step before this call.
+      parameters:
+        - $ref: '#/components/parameters/RepoId'
+      responses:
+        '200':
+          description: Run succeeded; full list after replacement (may contain no new candidates)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractionResult'
+              examples:
+                ok:
+                  $ref: '#/components/examples/ExtractionResultExample'
+        '404':
+          $ref: '#/components/responses/RepoNotFound'
+        '409':
+          description: A scan is already running for this repo, or the repo has nothing to analyse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+              examples:
+                inProgress:
+                  value:
+                    error:
+                      code: conventions_scan_in_progress
+                      message: A scan is already running for this repo
+                notIndexed:
+                  value:
+                    error:
+                      code: conventions_repo_not_indexed
+                      message: Index the repo before extracting conventions
+                      details: { reason: not_indexed }
+                noSamples:
+                  value:
+                    error:
+                      code: conventions_repo_not_indexed
+                      message: The repo has no source files to analyse
+                      details: { reason: no_sample_files }
+        '502':
+          description: The conventions model failed; nothing was stored, previous candidates kept
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+              examples:
+                timeout:
+                  value:
+                    error:
+                      code: conventions_extraction_failed
+                      message: The conventions model did not answer within 120 seconds
+                      details: { reason: timeout }
+
+  /conventions/{conventionId}:
+    patch:
+      tags: [conventions]
+      operationId: updateConvention
+      summary: Accept, reject or edit the rule text of one candidate
+      description: Flow 4. AC-09, AC-10, AC-11, AC-12, AC-04b, AC-08.
+      parameters:
+        - name: conventionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConventionPatch'
+            examples:
+              accept:
+                value: { status: accepted }
+              edit:
+                value: { rule: Data access goes through the shared API client module }
+      responses:
+        '200':
+          description: Updated candidate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConventionCandidate'
+              examples:
+                accepted:
+                  $ref: '#/components/examples/ConventionCandidateExample'
+        '404':
+          description: Candidate not in the caller's workspace (existence hidden)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+              examples:
+                notFound:
+                  value:
+                    error: { code: convention_not_found, message: Convention not found }
+        '409':
+          description: The candidate's repo is being scanned; curation is read-only until it ends
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+              examples:
+                inProgress:
+                  value:
+                    error:
+                      code: conventions_scan_in_progress
+                      message: A scan is in progress for this repo
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /skills:
+    get:
+      tags: [skills]
+      operationId: listSkills
+      summary: (existing) List skills — now includes updated_at
+      description: Delta only — each Skill carries `updated_at` (latest version time) so the client can pick the most recently updated extracted match (AC-19, ADR-0002).
+      responses:
+        '200':
+          description: Skills of the workspace
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Skill'
+    post:
+      tags: [skills]
+      operationId: createSkill
+      summary: (existing) Create a skill — now accepts source extracted and evidence_files
+      description: Delta only — flow 2 «name free» branch, AC-18. Other fields unchanged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSkillBody'
+            examples:
+              extracted:
+                value:
+                  name: repo-conventions
+                  description: 2 house conventions extracted from test-org/test-repo
+                  type: convention
+                  source: extracted
+                  enabled: false
+                  body: "# repo-conventions\n\nHouse conventions detected in this repo. Flag changes that violate any rule below and cite the offending `file:line`.\n\n## error handling\nErrors from API calls are surfaced via toast.\nDetected in `client/src/context/AppContext.jsx:25-25`.\n"
+                  evidence_files: [client/src/context/AppContext.jsx]
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Skill'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /skills/{skillId}:
+    put:
+      tags: [skills]
+      operationId: updateSkill
+      summary: (existing) Update a skill — now accepts evidence_files
+      description: Delta only — flow 2 «extracted match» branch, AC-19. A content change bumps the version (kind edit); links are kept.
+      parameters:
+        - name: skillId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSkillBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Skill'
+        '404':
+          description: Skill not in the caller's workspace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+              examples:
+                notFound:
+                  value:
+                    error: { code: skill_not_found, message: Skill not found }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+components:
+  parameters:
+    RepoId:
+      name: repoId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    RepoNotFound:
+      description: Repo not in the caller's workspace (existence hidden, AC-08)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          examples:
+            notFound:
+              value:
+                error: { code: repo_not_found, message: Repo not found }
+    ValidationError:
+      description: Request failed schema validation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          examples:
+            invalid:
+              value:
+                error:
+                  code: validation_error
+                  message: Request validation failed
+                  details: [{ path: [rule], message: String must contain at most 1000 character(s) }]
+
+  schemas:
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, pattern: '^[a-z][a-z0-9_]*$' }
+            message: { type: string }
+            details: {}
+
+    ConventionStatus:
+      type: string
+      enum: [pending, accepted, rejected]
+
+    ConventionCandidate:
+      type: object
+      required: [id, rule, original_rule, category, evidence_path, evidence_snippet, evidence_start_line, evidence_end_line, confidence, status]
+      properties:
+        id: { type: string, format: uuid }
+        rule: { type: string, minLength: 1, maxLength: 1000 }
+        original_rule: { type: string, minLength: 1, maxLength: 1000 }
+        category: { type: string, minLength: 1, maxLength: 40 }
+        evidence_path: { type: string, minLength: 1 }
+        evidence_snippet: { type: string, minLength: 1 }
+        evidence_start_line: { type: integer, minimum: 1 }
+        evidence_end_line: { type: integer, minimum: 1 }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        status: { $ref: '#/components/schemas/ConventionStatus' }
+
+    ConventionScan:
+      type: object
+      required: [scanned_at, sample_count]
+      properties:
+        scanned_at: { type: string, format: date-time }
+        sample_count: { type: integer, minimum: 0, maximum: 12 }
+
+    ConventionList:
+      type: object
+      required: [scan, scanning, candidates]
+      properties:
+        scan:
+          oneOf:
+            - $ref: '#/components/schemas/ConventionScan'
+            - type: 'null'
+          description: Last successful run; null when never scanned
+        scanning:
+          type: boolean
+          description: True while an extraction runs for this repo (AC-04b)
+        candidates:
+          type: array
+          items: { $ref: '#/components/schemas/ConventionCandidate' }
+
+    ExtractionResult:
+      allOf:
+        - $ref: '#/components/schemas/ConventionList'
+        - type: object
+          required: [new_count]
+          properties:
+            new_count:
+              type: integer
+              minimum: 0
+              maximum: 20
+              description: Candidates stored by this run; 0 drives the «no new conventions» notice (AC-07)
+
+    ConventionPatch:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        status: { $ref: '#/components/schemas/ConventionStatus' }
+        rule: { type: string, minLength: 1, maxLength: 1000, description: Trimmed before validation }
+
+    Skill:
+      type: object
+      description: Existing contract (vendor/shared knowledge.ts) plus `updated_at`.
+      required: [id, name, description, type, source, body, enabled, version]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        type: { type: string, enum: [rubric, convention, security, custom] }
+        source: { type: string, enum: [manual, imported, imported_url, extracted, community] }
+        body: { type: string }
+        enabled: { type: boolean }
+        version: { type: integer }
+        evidence_files:
+          type: [array, 'null']
+          items: { type: string }
+        updated_at:
+          type: string
+          format: date-time
+          description: New — time of the latest version (derived from skill_versions)
+
+    CreateSkillBody:
+      type: object
+      required: [name, description, type, body]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, maxLength: 1000 }
+        type: { type: string, enum: [rubric, convention, security, custom] }
+        body: { type: string, minLength: 1, maxLength: 50000 }
+        enabled: { type: boolean }
+        source:
+          type: string
+          enum: [manual, imported, extracted]
+          description: '`extracted` is new (ADR-0002)'
+        source_file: { type: string, maxLength: 255 }
+        evidence_files:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1 }
+          description: New — evidence paths of the accepted candidates
+
+    UpdateSkillBody:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, maxLength: 1000 }
+        type: { type: string, enum: [rubric, convention, security, custom] }
+        body: { type: string, minLength: 1, maxLength: 50000 }
+        enabled: { type: boolean }
+        note: { type: string, maxLength: 200 }
+        evidence_files:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1 }
+          description: New
+
+  examples:
+    ConventionCandidateExample:
+      value:
+        id: 00000000-0000-7000-8000-000000000001
+        rule: Errors from API calls are surfaced via toast using MESSAGES constants as fallbacks
+        original_rule: Errors from API calls are surfaced via toast using MESSAGES constants as fallbacks
+        category: error handling
+        evidence_path: client/src/context/AppContext.jsx
+        evidence_snippet: toast.error(error.response?.data?.message || error.message || MESSAGES.ERROR_FETCH_BLOGS)
+        evidence_start_line: 25
+        evidence_end_line: 25
+        confidence: 0.6
+        status: accepted
+    ConventionListExample:
+      value:
+        scan: { scanned_at: '2026-11-26T10:00:00Z', sample_count: 12 }
+        scanning: false
+        candidates:
+          - id: 00000000-0000-7000-8000-000000000001
+            rule: Errors from API calls are surfaced via toast using MESSAGES constants as fallbacks
+            original_rule: Errors from API calls are surfaced via toast using MESSAGES constants as fallbacks
+            category: error handling
+            evidence_path: client/src/context/AppContext.jsx
+            evidence_snippet: toast.error(error.response?.data?.message || error.message || MESSAGES.ERROR_FETCH_BLOGS)
+            evidence_start_line: 25
+            evidence_end_line: 25
+            confidence: 0.6
+            status: accepted
+    ExtractionResultExample:
+      value:
+        scan: { scanned_at: '2026-11-26T10:00:00Z', sample_count: 12 }
+        scanning: false
+        new_count: 1
+        candidates:
+          - id: 00000000-0000-7000-8000-000000000002
+            rule: HTTP access goes through the shared axios instance exported from client/src/api
+            original_rule: HTTP access goes through the shared axios instance exported from client/src/api
+            category: api layer
+            evidence_path: client/src/api/index.js
+            evidence_snippet: export { default as axios } from './axiosConfig'
+            evidence_start_line: 1
+            evidence_end_line: 1
+            confidence: 0.5
+            status: pending
