@@ -9,7 +9,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button, Dropdown, EmptyState, ErrorState, Icon, Skeleton } from "@devdigest/ui";
 import { AppShell } from "@/components/app-shell";
-import { useSkillStatsSummary, useSkills, useUpdateSkill } from "@/lib/hooks/skills";
+import { useDeleteSkill, useSkillStatsSummary, useSkills, useUpdateSkill } from "@/lib/hooks/skills";
+import { useToast } from "@/lib/toast";
 import { ImportSkillDrawer } from "../ImportSkillDrawer";
 import { SkillCard } from "../SkillCard";
 import { SkillPanel, type PanelTab } from "../SkillPanel";
@@ -22,6 +23,8 @@ export function SkillsView() {
   const params = useSearchParams();
   const { data: skills, isLoading, isError, refetch } = useSkills();
   const update = useUpdateSkill();
+  const del = useDeleteSkill();
+  const toast = useToast();
   // One batch request for every card's usage row.
   const { data: stats } = useSkillStatsSummary();
   const statsById = new Map((stats ?? []).map((row) => [row.skill_id, row]));
@@ -40,6 +43,18 @@ export function SkillsView() {
     router.replace(qs ? `/skills?${qs}` : "/skills");
   };
   const selectedId = selection.kind === "skill" ? selection.skill.id : null;
+
+  // Card trash icon: same confirm as the panel's Delete; closes the panel only
+  // when it was showing the deleted skill.
+  const deleteSkill = (skill: { id: string; name: string }) => {
+    if (!window.confirm(t("panel.deleteConfirm", { name: skill.name }))) return;
+    del.mutate(skill.id, {
+      onSuccess: () => {
+        toast.success(t("panel.deleted"));
+        if (skill.id === selectedId) go(null);
+      },
+    });
+  };
 
   return (
     <AppShell crumb={[{ label: t("page.crumbLab") }, { label: t("page.crumbSkills") }]}>
@@ -100,6 +115,8 @@ export function SkillsView() {
                 active={skill.id === selectedId}
                 onClick={() => go(skill.id)}
                 onToggle={(enabled) => update.mutate({ id: skill.id, patch: { enabled } })}
+                onDelete={() => deleteSkill(skill)}
+                deleting={del.isPending && del.variables === skill.id}
               />
             ))}
           </div>

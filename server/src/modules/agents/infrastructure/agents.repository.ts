@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import { DEFAULT_AGENT_DESCRIPTION } from '../domain/policies.js';
@@ -141,6 +141,16 @@ export class DrizzleAgentsRepository implements AgentsRepository {
         target: [t.agentSkills.agentId, t.agentSkills.skillId],
         set: { order },
       });
+  }
+
+  async enabledSkillCounts(workspaceId: string): Promise<Map<string, number>> {
+    const rows = await this.db
+      .select({ agentId: t.agentSkills.agentId, n: sql<number>`count(*)::int` })
+      .from(t.agentSkills)
+      .innerJoin(t.agents, eq(t.agents.id, t.agentSkills.agentId))
+      .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agentSkills.enabled, true)))
+      .groupBy(t.agentSkills.agentId);
+    return new Map(rows.map((r) => [r.agentId, r.n]));
   }
 
   async setSkills(agentId: string, links: SkillLinkInput[]): Promise<void> {

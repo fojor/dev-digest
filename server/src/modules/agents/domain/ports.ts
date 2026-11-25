@@ -33,6 +33,8 @@ export interface AgentsRepository {
   linkSkill(agentId: string, skillId: string, order: number): Promise<void>;
   /** Replace all links with `links`, order = index. */
   setSkills(agentId: string, links: SkillLinkInput[]): Promise<void>;
+  /** Enabled links per agent of the workspace; agents with none are absent. */
+  enabledSkillCounts(workspaceId: string): Promise<Map<string, number>>;
 }
 
 export type AgentsUnitOfWork = UnitOfWork<{ agents: AgentsRepository }>;

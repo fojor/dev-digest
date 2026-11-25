@@ -7,7 +7,7 @@ import type { Agent, AgentPatch, AgentVersion, NewAgent, SkillLink } from '../do
 import type { CreateAgentBody, UpdateAgentBody } from './schemas.js';
 
 /** Domain → API contract (snake_case). Shapes match the pre-onion DTOs exactly. */
-export function presentAgent(a: Agent): AgentDto {
+export function presentAgent(a: Agent, skillCount?: number): AgentDto {
   return {
     id: a.id,
     name: a.name,
@@ -21,6 +21,7 @@ export function presentAgent(a: Agent): AgentDto {
     strategy: a.strategy,
     ci_fail_on: a.ciFailOn,
     repo_intel: a.repoIntel,
+    ...(skillCount !== undefined ? { skill_count: skillCount } : {}),
   };
 }
 

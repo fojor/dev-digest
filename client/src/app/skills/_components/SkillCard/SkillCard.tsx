@@ -1,7 +1,8 @@
 /* SkillCard — one skill in the Skills list: name, global enabled switch,
    description, type + source, and the usage row (`N agents · P% pull ·
    A% accept`) from the page's ONE batch stats request. A disabled skill never
-   reaches any agent's prompt. */
+   reaches any agent's prompt. The trash icon only reports intent (`onDelete`);
+   the view owns the confirm, the mutation and the selection reset. */
 "use client";
 
 import React from "react";
@@ -18,6 +19,8 @@ export function SkillCard({
   active,
   onClick,
   onToggle,
+  onDelete,
+  deleting = false,
 }: {
   skill: Skill;
   /** Undefined while loading / when the batch has no row for the skill. */
@@ -25,6 +28,10 @@ export function SkillCard({
   active?: boolean;
   onClick: () => void;
   onToggle: (enabled: boolean) => void;
+  /** Called when the trash icon is used; omitted → no delete control. */
+  onDelete?: () => void;
+  /** The delete request for this skill is in flight. */
+  deleting?: boolean;
 }) {
   const t = useTranslations("skills");
   const color = SKILL_TYPE_COLOR[skill.type];
@@ -52,6 +59,23 @@ export function SkillCard({
         <span onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} title={t("card.enable")}>
           <Toggle on={skill.enabled} onChange={onToggle} size={14} />
         </span>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            // The card itself selects on Enter/Space; keep those keys on the button.
+            onKeyDown={(e) => e.stopPropagation()}
+            disabled={deleting}
+            title={t("card.delete")}
+            aria-label={t("card.delete")}
+            style={s.deleteButton(deleting)}
+          >
+            <Icon.Trash size={14} style={deleting ? s.spinning : undefined} />
+          </button>
+        )}
       </div>
       <div style={s.description}>{skill.description || t("card.noDescription")}</div>
       <div style={s.metaRow}>

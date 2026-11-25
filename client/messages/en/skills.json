@@ -22,6 +22,7 @@
   },
   "card": {
     "enable": "Enable skill",
+    "delete": "Delete skill",
     "noDescription": "No description",
     "source": {
       "manual": "Manual",

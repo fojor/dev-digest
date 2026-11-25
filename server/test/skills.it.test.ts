@@ -156,6 +156,10 @@ d('M2 skills (Testcontainers pg)', () => {
       [globallyOff.id, true, 3],
     ]);
 
+    // Agent cards: skill_count = enabled links (a globally-off skill still counts).
+    const listed = (await app.inject({ method: 'GET', url: '/agents' })).json();
+    expect(listed.find((a: { id: string }) => a.id === agent.id).skill_count).toBe(3);
+
     const [repo] = await pg.handle.db
       .insert(t.repos)
       .values({ workspaceId, owner: 'acme', name: 'skills-repo', fullName: 'acme/skills-repo' })

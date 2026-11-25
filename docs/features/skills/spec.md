@@ -22,7 +22,7 @@ Reusable, text-only skills that the user creates, edits, imports and links to ag
 
 | # | Surface | Where | What |
 |---|---------|-------|------|
-| S1 | Skills page | `/skills` (sidebar: SKILLS LAB → Skills) | card list (name, type, description, global on/off), search, side panel (Config editor · Preview), **Add Skill** → Create skill / Import from file… |
+| S1 | Skills page | `/skills` (sidebar: SKILLS LAB → Skills) | card list (name, type, description, global on/off, delete), search, side panel (Config editor · Preview), **Add Skill** → Create skill / Import from file… |
 | S2 | Import drawer | from S1 | upload `.md` / `.zip` → preview (editable) → **Save skill** |
 | S3 | Agent editor → **Skills** tab | `/agents/:id?tab=skills` | every skill with a checkbox, `N of M enabled`, filter, drag (or Alt+↑/↓) to reorder |
 | S4 | Run trace → Prompt assembly | `RunTraceDrawer` → `TraceBody` | **Skills (dynamic) · N tokens** block; Live log line `Loaded N skill(s): …` |
@@ -50,7 +50,7 @@ Stats, Versions, card stats/source and the editor chrome move into **Phase 2 (§
 | New agents | Only **Test Quality Reviewer**. |
 | API-contract skill | Not seeded — it is the import sample (`docs/skills/api-contract-guard`), attached by the user to the **Test Quality Reviewer**. |
 | Versioning | A content edit (name, description, type, body) bumps `skills.version` and snapshots the body into `skill_versions`; toggling `enabled` does not. No history UI. |
-| Delete | Deleting a skill removes it from every agent (FK cascade). |
+| Delete | Deleting a skill removes it from every agent (FK cascade). Available from the panel's **Delete** and from a trash icon on each card (same confirm), like agent cards. |
 | Scope of S1 | Only what the requirements list (see §2 "Out of scope"). |
 
 ## 4. Behaviour
@@ -122,6 +122,7 @@ Stats, Versions, card stats/source and the editor chrome move into **Phase 2 (§
 | PUT | `/skills/:id` | any of `name, description, type, body, enabled` → `Skill` |
 | DELETE | `/skills/:id` | `{ ok: true }` |
 | POST | `/skills/import/preview` | `{ filename, content_base64 }` → `SkillImportPreview` |
+| GET | `/agents` | `Agent[]` + `skill_count` (enabled links per agent, §9.11) |
 | GET | `/agents/:id/skills` | `AgentSkillLink[]` (`agent_id, skill_id, order, enabled`) |
 | POST | `/agents/:id/skills` | `{ skills: [{ skill_id, enabled }] }` \| `{ skill_ids }` \| `{ skill_id, order? }` → `AgentSkillLink[]` |
 
@@ -431,3 +432,46 @@ New contracts in `knowledge.ts` (both copies): `SkillStatsSummary`, `SkillStats`
 - **Not done** — the real-LLM run of the Test Quality Reviewer on #501 (step 8) needs a
   provider key and spends tokens; runs before this change have no `run_skills`, so pull rate
   reads 0 % until new runs happen (no backfill, by design).
+
+### 9.10 Card delete (follow-up)
+
+Agent cards have a trash icon; skill cards did not, so deleting a skill meant opening it first.
+
+- **Behaviour.** Each skill card shows a trash icon after the enabled switch. Click (or
+  Enter/Space on the focused icon) → the same confirm as the panel (`panel.deleteConfirm`) →
+  `DELETE /skills/:id` → toast `Skill deleted`. The click never selects the card. While the
+  request runs the icon spins and is disabled. If the deleted skill was the selected one, the
+  side panel closes (`?skill=` cleared); deleting another skill keeps the current selection.
+- **Ownership.** `SkillCard` stays presentational (`onDelete`, `deleting` props, label
+  `card.delete`); `SkillsView` owns the confirm, the `useDeleteSkill` mutation, the toast and the
+  selection reset. No API or contract change.
+- **AC31** Every skill card has a delete control with the panel's confirm; cancelling deletes
+  nothing; confirming removes the skill (and its agent links) and closes the panel only when it
+  showed that skill; clicking the control never selects the card. — `SkillCard.test.tsx`,
+  `SkillsView.test.tsx`, browser check.
+- **Verified** — client 43 files / 172 tests, typecheck and ESLint green; browser (local DB):
+  deleting another skill from its card kept the open panel, deleting the open skill closed it,
+  both with the confirm and the `Skill deleted` toast.
+
+### 9.11 Skill count on agent cards (follow-up)
+
+The agent card had a `skillCount` badge slot (`agents.card.skillCount`, Sparkles icon) that no
+caller filled, so cards never showed how many skills an agent uses.
+
+- **What counts.** Links with `agent_skills.enabled = true`, the same number as the Skills tab's
+  "N of M enabled". A link whose skill is switched off globally still counts (the tab shows it
+  checked with `off globally`); an unchecked link does not. 0 → the badge reads `0 skills`.
+- **Where it comes from.** `GET /agents` returns each agent with `skill_count` (one grouped query,
+  not a request per card); `Agent.skill_count` is optional in the contract (both copies), so other
+  agent responses (`GET /agents/:id`, create, update) parse without it.
+- **Freshness.** Saving an agent's skill links and deleting a skill invalidate the agents list, so
+  the badge updates without a reload.
+- **Where shown.** The agents grid (`/agents`) and the agent list beside the editor
+  (`/agents/:id`); singular/plural via ICU (`1 skill`, `3 skills`).
+- **AC32** Each agent card shows `N skills` with N = enabled links; checking/unchecking a skill in
+  the Skills tab or deleting a skill updates it without a reload. — `agents` service/integration
+  test, `AgentCard.test.tsx`, browser check.
+- **Verified** — server 41 files / 284 tests (incl. `skill_count` on Postgres: 4 links, 1
+  unchecked → 3), client 43 / 173, typecheck, ESLint, contract check green; browser: Test
+  Quality Reviewer shows `3 skills` (= "3 of 5 enabled"), checking a 4th skill in its Skills tab
+  updated the card to `4 skills` without a reload, unchecking it returned `3 skills`.

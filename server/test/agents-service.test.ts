@@ -75,6 +75,15 @@ class FakeAgents implements AgentsRepository {
     this.links.set(agentId, skillIds.map((skillId, order) => ({ skillId, order })));
   }
 
+  async enabledSkillCounts(ws: string) {
+    const counts = new Map<string, number>();
+    for (const a of await this.list(ws)) {
+      const n = (this.links.get(a.id) ?? []).filter((l) => l.enabled !== false).length;
+      if (n > 0) counts.set(a.id, n);
+    }
+    return counts;
+  }
+
   snapshot() {
     return {
       agents: new Map([...this.agents].map(([k, v]) => [k, { ...v }])),
@@ -179,6 +188,19 @@ describe('AgentsService', () => {
       { skillId: 's1', order: 0 },
       { skillId: 's2', order: 1 },
     ]);
+  });
+
+  it('listWithSkillCounts counts enabled links only; none → 0', async () => {
+    const { service, repo } = setup();
+    const a = await service.create(input);
+    const b = await service.create({ ...input, name: 'other' });
+    repo.links.set(a.id, [
+      { skillId: 's1', order: 0, enabled: true },
+      { skillId: 's2', order: 1, enabled: false },
+      { skillId: 's3', order: 2, enabled: true },
+    ]);
+    const rows = await service.listWithSkillCounts('w1');
+    expect(Object.fromEntries(rows.map((r) => [r.agent.id, r.skillCount]))).toEqual({ [a.id]: 2, [b.id]: 0 });
   });
 
   it('listModels degrades to [] when the provider is unavailable', async () => {

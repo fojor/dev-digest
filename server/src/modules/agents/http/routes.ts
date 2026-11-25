@@ -46,7 +46,7 @@ export async function registerAgentsRoutes(
 
   app.get('/agents', async (req) => {
     const { workspaceId } = await context(req);
-    return (await service.list(workspaceId)).map(presentAgent);
+    return (await service.listWithSkillCounts(workspaceId)).map((x) => presentAgent(x.agent, x.skillCount));
   });
 
   app.get('/agents/:id', { schema: { params: IdParams } }, async (req) => {

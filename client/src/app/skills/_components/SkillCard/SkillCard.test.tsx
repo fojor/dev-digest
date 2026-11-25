@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { Skill } from "@devdigest/shared";
 import skills from "../../../../../messages/en/skills.json";
@@ -39,5 +39,26 @@ describe("SkillCard", () => {
     renderCard({ skill: { ...SKILL, source: "manual" } });
     expect(screen.getByText("Manual")).toBeInTheDocument();
     expect(screen.getByText("— agents · — pull · — accept")).toBeInTheDocument();
+  });
+
+  it("has no delete control without onDelete", () => {
+    renderCard();
+    expect(screen.queryByRole("button", { name: "Delete skill" })).not.toBeInTheDocument();
+  });
+
+  it("the trash icon reports delete without selecting the card", () => {
+    const onClick = vi.fn();
+    const onDelete = vi.fn();
+    renderCard({ onClick, onDelete });
+    const trash = screen.getByRole("button", { name: "Delete skill" });
+    fireEvent.click(trash);
+    fireEvent.keyDown(trash, { key: "Enter" });
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it("disables the trash icon while deleting", () => {
+    renderCard({ onDelete: () => {}, deleting: true });
+    expect(screen.getByRole("button", { name: "Delete skill" })).toBeDisabled();
   });
 });

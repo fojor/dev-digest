@@ -5,6 +5,7 @@
 import React from "react";
 import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
+import { agentQueries } from "./agents";
 import type {
   AgentSkillLink,
   Skill,
@@ -150,8 +151,9 @@ export function useDeleteSkill() {
     mutationFn: (id: string) => api.del<{ ok: boolean }>(`/skills/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: skillQueries.list().queryKey });
-      // Links cascade server-side; every agent's link list may have changed.
+      // Links cascade server-side; every agent's link list (and skill count) may have changed.
       qc.invalidateQueries({ queryKey: ["agent-skills"] });
+      qc.invalidateQueries({ queryKey: agentQueries.list().queryKey });
     },
   });
 }
@@ -188,8 +190,9 @@ export function useSetAgentSkills(agentId: string) {
     onError: (_e, _v, ctx) => qc.setQueryData(key, ctx?.previous),
     onSuccess: (data) => {
       qc.setQueryData(key, data);
-      // "N agents" on the skill cards counts enabled links.
+      // "N agents" on the skill cards and "N skills" on the agent cards count enabled links.
       qc.invalidateQueries({ queryKey: skillQueries.statsSummary().queryKey });
+      qc.invalidateQueries({ queryKey: agentQueries.list().queryKey });
     },
   });
 }

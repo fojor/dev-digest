@@ -38,6 +38,15 @@ export class AgentsService {
     return this.d.agents.list(workspaceId);
   }
 
+  /** Agents with the number of skills each has switched on (agent cards). */
+  async listWithSkillCounts(workspaceId: string): Promise<{ agent: Agent; skillCount: number }[]> {
+    const [agents, counts] = await Promise.all([
+      this.d.agents.list(workspaceId),
+      this.d.agents.enabledSkillCounts(workspaceId),
+    ]);
+    return agents.map((agent) => ({ agent, skillCount: counts.get(agent.id) ?? 0 }));
+  }
+
   async get(workspaceId: string, id: string): Promise<Agent> {
     const agent = await this.d.agents.getById(workspaceId, id);
     if (!agent) throw new AgentNotFound();
