@@ -13,6 +13,7 @@ Selection rules, review and promotion to CLAUDE.md — skill `engineering-insigh
 ## Codebase Patterns
 
 - 2026-11-20 · i18n in shared components · component tests wrap only their own namespace (e.g. NextIntlClientProvider messages={{ prReview }}), so a shared component under src/components that calls useTranslations('common') breaks every consumer's test → keep shared components presentational and take already-translated strings as props, because the caller owns the namespace · RunCostBadge tokensLabel prop, RunHistory.test.tsx
+- 2026-11-26 · sidebar entries · the sidebar items come only from the vendored NAV list in src/vendor/ui/nav.ts (':repoId' hrefs resolved by resolveHref), while components/app-shell/helpers.ts only maps a pathname to the active key — so helpers.ts already 'knowing' a page (e.g. /conventions) does NOT mean it appears in the sidebar → to add a page to the sidebar, add an item to NAV in vendor/ui/nav.ts as a vendored change (same PR, noted), because grepping client/src/components for the link finds nothing · client/src/vendor/ui/nav.ts NAV (SKILLS LAB has only skills, agents), app-shell/helpers.ts:31
 
 ## Tool & Library Notes
 
