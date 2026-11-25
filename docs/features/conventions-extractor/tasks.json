@@ -190,7 +190,7 @@
         "client/src/app/repos/[repoId]/conventions/helpers.test.ts"
       ],
       "file": "docs/features/conventions-extractor/tasks/t09-skill-draft-helpers.md",
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "T10",

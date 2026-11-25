@@ -16,7 +16,7 @@
 | T6 | Build the extraction input and the single structured model call | infra | Oleksii B | M | T3, T4 | done | COMMIT |
 | T7 | Extend the skills API for extracted skills | app | Oleksii B | S | T2 | done | COMMIT |
 | T8 | Implement the conventions service with the per-repo scan guard and run log | app | Oleksii B | M | T3, T4, T5, T6 | todo | — |
-| T9 | Add the client helpers that build the skill draft and find the extracted name match | ui | Oleksii B | S | T2 | todo | — |
+| T9 | Add the client helpers that build the skill draft and find the extracted name match | ui | Oleksii B | S | T2 | done | COMMIT |
 | T10 | Expose the conventions routes and wire the module | ports | Oleksii B | M | T2, T8 | todo | — |
 | T11 | Build the Conventions page, its hooks, the sidebar entry and the re-scan confirmation | ui | Oleksii B | L | T10 | todo | — |
 | T12 | Build the candidate card with evidence, accept/reject and inline rule editing | ui | Oleksii B | M | T11 | todo | — |
