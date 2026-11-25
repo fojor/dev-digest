@@ -13,7 +13,7 @@
 | T3 | Add the conventions domain: types, errors, ports, candidate normalisation and evidence verification | domain | Oleksii B | M | — | done | COMMIT |
 | T4 | Add the secret filter, repeat suppression and run limits to the conventions domain | domain | Oleksii B | M | — | done | COMMIT |
 | T5 | Implement the conventions repository with the replace-pending transaction | infra | Oleksii B | M | T1, T2, T3 | done | COMMIT |
-| T6 | Build the extraction input and the single structured model call | infra | Oleksii B | M | T3, T4 | todo | — |
+| T6 | Build the extraction input and the single structured model call | infra | Oleksii B | M | T3, T4 | done | COMMIT |
 | T7 | Extend the skills API for extracted skills | app | Oleksii B | S | T2 | todo | — |
 | T8 | Implement the conventions service with the per-repo scan guard and run log | app | Oleksii B | M | T3, T4, T5, T6 | todo | — |
 | T9 | Add the client helpers that build the skill draft and find the extracted name match | ui | Oleksii B | S | T2 | todo | — |

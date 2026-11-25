@@ -48,11 +48,15 @@ export interface SampleSource {
   read(repoId: string, limit: number): Promise<AnalysedFile[]>;
 }
 
-/** The single structured model call of a run (throws ExtractionFailed). */
+/**
+ * The single structured model call of a run (throws ExtractionFailed). It fits
+ * the input into the token budget first and returns the files it actually sent
+ * — evidence must come from those (AC-05).
+ */
 export interface ExtractionModel {
   extract(input: {
     workspaceId: string;
     files: AnalysedFile[];
     doNotRepeat: string[];
-  }): Promise<{ model: string; items: unknown[] }>;
+  }): Promise<{ model: string; items: unknown[]; files: AnalysedFile[] }>;
 }

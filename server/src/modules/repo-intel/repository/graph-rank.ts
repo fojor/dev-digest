@@ -1,5 +1,5 @@
 /** repo-intel queries — Import graph (`file_edges`) and PageRank output (`file_rank`). */
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import type { FileRankRow } from '../types.js';
@@ -51,7 +51,7 @@ export async function getFileRankFor(
     .where(and(eq(t.fileRank.repoId, repoId), inArray(t.fileRank.filePath, paths)));
 }
 
-/** Top `limit` paths by rank DESC (caller filters tests/configs in JS). */
+/** Top `limit` paths by rank DESC, equal ranks by path (deterministic sample sets); caller filters tests/configs in JS. */
 export async function getRankedPaths(
   db: Db,
   repoId: string,
@@ -61,6 +61,6 @@ export async function getRankedPaths(
     .select({ path: t.fileRank.filePath, rank: t.fileRank.rank })
     .from(t.fileRank)
     .where(eq(t.fileRank.repoId, repoId))
-    .orderBy(desc(t.fileRank.rank))
+    .orderBy(desc(t.fileRank.rank), asc(t.fileRank.filePath))
     .limit(limit);
 }
