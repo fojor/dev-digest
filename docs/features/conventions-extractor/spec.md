@@ -53,19 +53,17 @@ Decisions taken in the interview and from the mockups (owner, 2026-11-25):
   many sample files it analysed, so a run that found nothing still leaves a trace. This needs one
   small schema change to the existing candidate table and the repo record, plus the matching
   contract fields in both copies (no new table).
-- A conventions skill belongs to its repo: it is applied only to reviews of that repo's pull
-  requests, even when linked to an agent that reviews other repos. This adds a repo link to the
-  skill record (same schema change, no new table).
 - Rejected candidates stay visible, marked as rejected; the decision can be changed either way.
 - Re-scan replaces only pending candidates and keeps accepted and rejected ones (with their
   edits); the accepted and rejected rules are given to the model so it does not propose them
   again; if pending candidates exist the Developer confirms the replacement first.
 - Only the rule text of a candidate is editable; evidence, category and confidence are read-only.
-- Each repo has at most one conventions skill. If the repo already has one, Create skill updates
-  it as a new version (the modal warns first), overwriting any hand edits made in Skills Lab since
-  the last save (they stay in the version history); otherwise a new skill is created. The default
-  name is `repo-conventions`, or `<repo>-conventions` when that name is already taken by another
-  skill. A new skill is disabled until the Developer enables it. Linking to agents stays manual.
+- The conventions skill's default name is `repo-conventions`. Saving with the name of an
+  existing *extracted* skill updates that skill as a new version (the modal warns first),
+  overwriting any hand edits made in Skills Lab since the last save (they stay in the version
+  history); otherwise a new skill is created. A new skill is disabled until the Developer enables
+  it. Like every skill, it applies wherever it is linked — it is not limited to its repo. Linking
+  to agents stays manual.
 - Extraction runs while the Developer waits (no background job); one run per repo at a time.
 - A repo without a code index cannot be extracted; the Developer is told why and nothing is
   spent.
@@ -81,8 +79,7 @@ Decisions taken in the interview and from the mockups (owner, 2026-11-25):
 - Every candidate the Developer sees is backed by verified evidence from the repo, so curation is
   a judgment call, not a fact-check, and the Developer's decisions are never asked twice.
 - Curated conventions reach reviewer agents through the existing skills mechanism, with no
-  hand-copying, apply only to the repo they came from, and can be refreshed after a re-scan
-  without creating duplicate skills.
+  hand-copying, and can be refreshed after a re-scan without creating duplicate skills.
 
 ## 3. Non-goals
 
@@ -90,8 +87,9 @@ Decisions taken in the interview and from the mockups (owner, 2026-11-25):
   code only; learning from history is a separate capability that needs review data over time.
 - **Exporting conventions to other tools' rule files** (agent instruction files, editor rule
   files) — DevDigest only needs its own skill format.
-- **Repo-scoping for other skills** — only conventions skills get a repo; manual and imported
-  skills keep applying wherever they are linked.
+- **Limiting a conventions skill to its own repo at review time** — owner decision: a
+  conventions skill applies wherever the Developer links it, like every other skill; the
+  Developer controls this by choosing which agents to link it to.
 - **Re-verifying accepted candidates or the saved skill when the code changes later** — evidence
   is verified once, at extraction time.
 - **Background extraction with live progress** — runs are short single model calls; the Developer
@@ -239,7 +237,7 @@ Decisions taken in the interview and from the mockups (owner, 2026-11-25):
 
 **Given** a repo with at least one accepted candidate
 **When** the Developer chooses Create skill
-**Then** a modal opens that says how many accepted conventions it was merged from and in which repo, and that everything is editable before saving; it is pre-filled with: name «repo-conventions» (or the repo name followed by «-conventions» when «repo-conventions» is taken by another skill; or the current name when the repo already has a conventions skill); description «N house conventions extracted from <owner/repo>»; enabled switched off, with a hint to review the body before it reaches an agent's prompt; and a markdown body that starts with a heading of the skill name and an instruction to flag changes that violate any rule below and cite the offending file and line, followed by one section per category holding each accepted rule of that category and the file and line range it was detected in
+**Then** a modal opens that says how many accepted conventions it was merged from and in which repo, and that everything is editable before saving; it is pre-filled with: name «repo-conventions»; description «N house conventions extracted from <owner/repo>»; enabled switched off, with a hint to review the body before it reaches an agent's prompt; and a markdown body that starts with a heading of the skill name and an instruction to flag changes that violate any rule below and cite the offending file and line, followed by one section per category holding each accepted rule of that category and the file and line range it was detected in
 
 ### AC-16 (US-06) — domain invariant: nothing to assemble
 
@@ -255,19 +253,19 @@ Decisions taken in the interview and from the mockups (owner, 2026-11-25):
 
 ### AC-18 (US-07) — happy path: create
 
-**Given** the repo has no conventions skill yet
-**When** the Developer saves the modal
-**Then** a new skill of type convention, belonging to this repo, is created at version 1 with the enabled state chosen in the modal; it appears in Skills Lab labelled as extracted, and the Developer is told where to find it
+**Given** the modal is open and no skill in the workspace has the chosen name
+**When** the Developer saves
+**Then** a new skill of type convention is created at version 1 with the enabled state chosen in the modal; it appears in Skills Lab labelled as extracted, and the Developer is told where to find it
 
 ### AC-19 (US-07) — happy path: update existing
 
-**Given** the repo already has a conventions skill (from an earlier save), possibly edited by hand in Skills Lab since
-**When** the modal opens and the Developer saves
+**Given** the workspace already has an extracted skill with the chosen name (from an earlier save, from another repo, or edited by hand in Skills Lab since)
+**When** the modal opens or the name is changed to that name, and the Developer saves
 **Then** the modal warns beforehand that the existing skill will be updated to its next version and its previous content kept in its history, and saving replaces its name, description and body as a new version — hand edits are overwritten, not merged — while every agent link to it is kept; the enabled switch starts from the existing skill's current state, and the saved state is whatever the switch shows
 
 ### AC-20 (US-07) — domain invariant: no silent overwrite of other skills
 
-**Given** the workspace has another skill with the chosen name (manual, imported, or another repo's conventions skill)
+**Given** the workspace has a skill with the chosen name that was not created by the extractor (manual, imported)
 **When** the Developer tries to save
 **Then** the system blocks the save and asks for a different name, leaving the other skill untouched
 
@@ -288,12 +286,6 @@ Decisions taken in the interview and from the mockups (owner, 2026-11-25):
 **Given** a repo whose style configs or sample files contain credentials
 **When** the Developer runs extraction
 **Then** only the allow-listed style configs are read (environment files, package-manager auth files and CI files never are), and any candidate whose fragment matches a known credential pattern is discarded, so no credential is ever shown on the page or stored with a candidate
-
-### AC-25 (US-08) — cross-context: repo-scoped
-
-**Given** an enabled conventions skill of repo A linked and enabled on a reviewer agent
-**When** the Developer runs that agent on a pull request of repo B
-**Then** the conventions skill is left out of the review, and the run's prompt assembly shows only the skills that apply to repo B
 
 ### AC-23 (US-06) — domain invariant: trust warning
 
@@ -343,9 +335,12 @@ Decisions taken in the interview and from the mockups (owner, 2026-11-25):
     self-review secret check are discarded before storage, so secrets never land in the database
     (AC-24). A secret embedded in a sample source file still reaches the model provider, exactly
     as it would in a regular review.
-  - *Cross-repo bleed:* repo A's conventions enforced on repo B's pull requests would produce
-    wrong findings. Response: a conventions skill belongs to its repo and is applied only to that
-    repo's reviews (AC-25); saving from repo B can never update repo A's skill (AC-19, AC-20).
+  - *Cross-repo overwrite:* the shared default name means saving from repo B can update the skill
+    assembled from repo A. Response: the modal warns before updating (AC-19) and the previous
+    content stays in the skill's version history.
+  - *Cross-repo bleed (accepted risk):* a conventions skill linked to an agent that reviews
+    several repos enforces repo A's rules on repo B. Response: the Developer chooses which agents
+    to link it to; the skill's accept-rate stat shows the effect.
   - *Cross-workspace access:* hide existence (AC-08) — revealing that a repo or candidate exists
     in another workspace would leak its rules and code.
   - *Cost abuse via repeated scans:* one run per repo at a time (AC-04); a single model call per
@@ -374,6 +369,6 @@ local-first; there is no product analytics). Baseline 0 — new feature.
 
 ## 8. Open questions
 
-- [ ] Is the feature still size S now that it adds a schema change (candidate status, category and line range; last-scan facts on the repo; a repo link on skills) on top of a new module and new API, and touches review prompt assembly? Default now: S, quick route. — owner: Oleksii B, due: before sdd:design (re-run classify-size if not)
+- [ ] Is the feature still size S now that it adds a schema change (candidate status, category and line range; last-scan facts on the repo) on top of a new module and new API? Default now: S, quick route. — owner: Oleksii B, due: before sdd:design (re-run classify-size if not)
 
-Resolved 2026-11-25 (owner): conventions skills are repo-scoped (AC-25); the minimum evidence is one complete non-blank line (AC-05); hand edits in Skills Lab are overwritten on the next save and kept in history (AC-19).
+Resolved 2026-11-25 (owner): conventions skills are not limited to their repo (§3); the minimum evidence is one complete non-blank line (AC-05); hand edits in Skills Lab are overwritten on the next save and kept in history (AC-19).
