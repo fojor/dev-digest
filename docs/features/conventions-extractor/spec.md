@@ -384,8 +384,10 @@ local-first; there is no product analytics). Baseline 0 — new feature.
 ## 8. Open questions
 
 - [ ] Is the feature still size S now that it adds a schema change (candidate status, category and line range; last-scan facts on the repo) on top of a new module and new API? Default now: S, quick route. — owner: Oleksii B, due: before sdd:design (re-run classify-size if not)
-- [ ] Does the skills capability need extending so the extractor can save through it (accept the `extracted` source and a version kind for an extractor save), rather than the extractor writing skills directly? Default now: extend the skills capability; general skill validation stays as is. — owner: Tech Lead, due: before sdd:design
-- [ ] Where do the credential patterns used by AC-24 live, given the pre-PR self-review secret check is assistant tooling the server cannot import? Default now: copy them into the server with a test that keeps both lists in sync. — owner: Security Lead, due: before sdd:design
-- [ ] How does the existing conventions scaffolding change? Default now: the candidate review status replaces the `accepted` flag in both contract copies; the two-step conventions mock is retired (one model call per run); the skill's evidence-files field is filled with the evidence paths of the accepted candidates. — owner: Tech Lead, due: before sdd:design
+- [x] Does the skills capability need extending so the extractor can save through it (accept the `extracted` source and a version kind for an extractor save), rather than the extractor writing skills directly? Default now: extend the skills capability; general skill validation stays as is. — owner: Tech Lead, due: before sdd:design
+- [x] Where do the credential patterns used by AC-24 live, given the pre-PR self-review secret check is assistant tooling the server cannot import? Default now: copy them into the server with a test that keeps both lists in sync. — owner: Security Lead, due: before sdd:design
+- [x] How does the existing conventions scaffolding change? Default now: the candidate review status replaces the `accepted` flag in both contract copies; the two-step conventions mock is retired (one model call per run); the skill's evidence-files field is filled with the evidence paths of the accepted candidates. — owner: Tech Lead, due: before sdd:design
+
+Resolved by design 2026-11-26: the three ticked questions above, as their stated defaults — see [sad.md](./sad.md) §4, §5, §8 and ADR-0002.
 
 Resolved 2026-11-25 (owner): conventions skills are not limited to their repo (§3); the minimum evidence is one complete non-blank line (AC-05); hand edits in Skills Lab are overwritten on the next save and kept in history (AC-19).
