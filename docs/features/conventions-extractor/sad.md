@@ -266,6 +266,249 @@ sequenceDiagram
     Web-->>Dev: saved — find it in Skills Lab
 ```
 
+### Flow 3: view candidates (US-02)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as user
+    participant UI as ui
+    participant S as service
+    participant D as data-store
+
+    Note over U,UI: Precondition: the Developer opens the Conventions page of a repo (SCR-01)
+    U->>UI: open Conventions page
+    UI->>S: list candidates for repo
+    S->>D: look up repo within the Developer's workspace
+    alt repo belongs to another workspace (AC-08)
+        S-->>UI: not found
+        UI-->>U: repo not found, no rules or code revealed
+    else repo in workspace
+        S->>D: read scan facts and candidates of the repo
+        D-->>S: scan facts, candidates
+        S->>S: check whether the repo is scanning
+        S-->>UI: scan facts, scanning flag, candidates
+        alt never scanned or last run verified none (AC-07)
+            UI-->>U: empty state with Run extraction, or no convention could be backed by evidence
+        else candidates exist (AC-06)
+            UI-->>U: header with repo, files analysed, last run, accepted of total, and cards with rule, category, status, evidence lines, fragment, confidence
+        end
+        opt repo is scanning (AC-04b)
+            UI-->>U: view only until the run ends
+        end
+    end
+    Note over U,UI: Postcondition: nothing changed, the page reflects stored state
+```
+
+### Flow 4: accept, reject or edit a candidate (US-03, US-04)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as user
+    participant UI as ui
+    participant S as service
+    participant D as data-store
+
+    Note over U,UI: Precondition: a candidate card is shown on SCR-01
+    U->>UI: accept, reject, or save edited rule text
+    alt edited text is empty or over the rule limit (AC-12)
+        UI-->>U: previous text kept, rule must be 1 to 1000 characters
+    else change is valid
+        UI->>S: change candidate status or rule text
+        S->>D: look up candidate within the Developer's workspace
+        alt candidate belongs to another workspace (AC-08)
+            S-->>UI: not found
+            UI-->>U: candidate not found
+        else repo is scanning (AC-04b)
+            S-->>UI: refused, scan in progress
+            UI-->>U: change refused until the run ends
+        else allowed
+            S->>D: update status or rule text
+            Note over S,D: persists candidate status or rule text, original rule text kept
+            D-->>S: updated candidate
+            S-->>UI: updated candidate
+            alt accepted (AC-09)
+                UI-->>U: card marked Accepted and highlighted, accepted count up
+            else rejected (AC-10)
+                UI-->>U: card stays, dimmed and marked Rejected, left out of skill drafts
+            else rule text edited (AC-11)
+                UI-->>U: new text shown, evidence, category, confidence and status unchanged
+            end
+        end
+    end
+    Note over U,UI: Postcondition: the change survives a page reload
+```
+
+### Flow 5: re-scan with confirmation (US-05)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as user
+    participant UI as ui
+    participant S as service
+    participant D as data-store
+
+    Note over U,UI: Precondition: the repo already has candidates
+    U->>UI: click Re-scan
+    alt pending candidates exist (AC-14)
+        UI-->>U: confirm that N pending will be replaced, M with edited text, accepting keeps a candidate (SCR-02)
+        alt Developer cancels
+            UI-->>U: nothing changed
+        else Developer confirms
+            UI->>S: extract for repo
+        end
+    else no pending candidates
+        UI->>S: extract for repo
+    end
+    Note over S: extraction runs as in flow 1 and flow 6
+    alt run failed (AC-03)
+        S-->>UI: extraction failed, reason
+        UI-->>U: failure shown, all candidates and last scan facts as before
+    else run succeeded (AC-13)
+        S->>D: in one transaction remove pending, store new verified, record scan facts
+        Note over S,D: persists candidates and repo scan facts, accepted and rejected untouched
+        S-->>UI: scan facts and full list
+        alt no new verified candidates (AC-07)
+            UI-->>U: list stays with notice that no new conventions were found
+        else new candidates
+            UI-->>U: accepted and rejected unchanged, pending replaced
+        end
+    end
+```
+
+### Flow 6: candidate screening inside a run (US-01, US-02, US-05)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant S as service
+    participant D as data-store
+    participant X as external-system
+
+    Note over S,X: Precondition: the run passed the index and one-run checks of flow 1
+    S->>S: take up to 12 ranked sample files, equal ranks by path, and allow-listed style configs only (AC-24)
+    S->>D: read current and original text of accepted and rejected candidates
+    D-->>S: do-not-repeat list
+    S->>S: fit input into the budget, dropping lowest-ranked sample files whole first
+    S->>X: one structured request with untrusted files and the do-not-repeat list
+    alt no answer within 120 seconds or not readable as a list (AC-03)
+        X-->>S: failure
+        Note over S: run fails, nothing stored
+    else list of candidates
+        X-->>S: candidates
+        S->>S: cut over-long rule and category, clamp confidence, drop candidates missing a field (AC-03b)
+        S->>S: drop candidates whose evidence file was not analysed, fragment absent or under one full line, record first-occurrence lines (AC-05)
+        S->>S: drop candidates whose rule, category or fragment matches a credential pattern (AC-24)
+        S->>S: drop candidates equal to an accepted or rejected rule (AC-13)
+        S->>S: keep at most 20, lowest confidence dropped first
+        S->>S: log model used, proposed, discarded by reason, stored, duration
+    end
+    Note over S,X: Postcondition: only verified candidates go on to be stored by flow 1 or flow 5
+```
+
+### Flow 7: open and edit the skill draft (US-06, US-07)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as user
+    participant UI as ui
+    participant S as service
+
+    Note over U,UI: Precondition: SCR-01 is shown for a repo
+    alt no accepted candidates (AC-16)
+        UI-->>U: Create skill unavailable, accept at least one candidate first
+    else at least one accepted
+        U->>UI: click Create skill
+        UI->>S: list candidates for repo
+        S-->>UI: candidates and scanning flag
+        alt repo is scanning (AC-04b)
+            UI-->>U: refused, scan in progress
+        else not scanning (AC-15)
+            UI->>UI: build draft from accepted candidates, categories merged and sorted, rules by confidence
+            UI-->>U: modal pre-filled with repo-conventions, description, enabled off, body, and the trust warning (AC-23)
+            U->>UI: edit name, description, body, enabled
+            alt cancel or close (AC-21)
+                UI-->>U: nothing created or changed
+            else save with an empty field, a non-slug name, or over a limit (AC-17)
+                UI-->>U: field marked with the rule it breaks, other input kept
+            else save with valid fields
+                Note over UI: continues in flow 2
+            end
+        end
+    end
+```
+
+### Flow 8: apply the conventions in a review (US-08)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as user
+    participant UI as ui
+    participant S as service
+    participant D as data-store
+    participant X as external-system
+
+    Note over U,UI: Precondition: a saved conventions skill exists, created disabled
+    U->>UI: enable the skill in Skills Lab (SCR-04)
+    UI->>S: enable skill
+    S->>D: update skill enabled state
+    Note over S,D: persists skill enabled state
+    U->>UI: link and enable the skill on a reviewer agent (SCR-05)
+    UI->>S: link skill to agent
+    S->>D: store agent skill link
+    Note over S,D: persists agent skill link and order
+    U->>UI: run a review with the agent (SCR-06)
+    UI->>S: start review
+    S->>D: load enabled skills linked and enabled on the agent
+    D-->>S: skills
+    alt conventions skill disabled or link disabled (AC-22)
+        S->>X: prompt without the conventions rules
+    else enabled and linked (AC-22)
+        S->>X: prompt with the conventions rules in the skills block
+    end
+    X-->>S: findings
+    S-->>UI: review result with prompt assembly
+    UI-->>U: prompt assembly shows the conventions skill only when it applied
+```
+
+**Coverage (sequences, 2026-11-26).**
+
+| User story | Flows |
+|---|---|
+| US-01 Run extraction | 1, 6 |
+| US-02 Review candidates | 3, 6 |
+| US-03 Accept or reject | 4 |
+| US-04 Edit rule text | 4 |
+| US-05 Re-scan | 5, 1, 6 |
+| US-06 Assemble skill | 7, 2 |
+| US-07 Save or discard | 2, 7 |
+| US-08 Apply in reviews | 8 |
+
+| AC | Shown in | AC | Shown in |
+|---|---|---|---|
+| AC-01 | flow 1 happy path | AC-13 | flow 5 success branch; flow 6 repeat drop |
+| AC-02 | flow 1 «not indexed» branch | AC-14 | flow 5 confirm / cancel branches |
+| AC-03 | flow 1, 5, 6 failure branches | AC-15 | flow 7 «not scanning» branch |
+| AC-03b | flow 6 normalise step | AC-16 | flow 7 «no accepted» branch |
+| AC-04 | flow 1 «run in progress» branch | AC-17 | flow 7 invalid-save branch |
+| AC-04b | flow 3 opt, flow 4 and flow 7 «scanning» branches | AC-18 | flow 2 «name free» branch |
+| AC-05 | flow 6 verification step | AC-19 | flow 2 «extracted match» branch |
+| AC-06 | flow 3 «candidates exist» branch | AC-20 | flow 2 «manual or imported only» branch |
+| AC-07 | flow 3 empty branch; flow 5 «no new» branch | AC-21 | flow 7 cancel branch |
+| AC-08 | flow 3 and flow 4 «another workspace» branches | AC-22 | flow 8 both branches |
+| AC-09 | flow 4 accepted branch | AC-23 | flow 7 modal open step |
+| AC-10 | flow 4 rejected branch | AC-24 | flow 6 allow-list and credential steps |
+| AC-11 | flow 4 edited branch | | |
+| AC-12 | flow 4 invalid-text branch | | |
+
+No AC is non-runtime; none is uncovered.
+
+**Flags for design:** none — every participant above maps to a §5 container (ui = Studio web app, service = API server, data-store = Database, external-system = conventions model provider). Flows 1–2 keep their design-stage participant names.
+
 ## 7. Deployment view
 
 N/A — reuses the existing local deployment (server :3001, client :3000, Postgres in Docker); one migration, no new process or infrastructure.
