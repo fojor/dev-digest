@@ -43,8 +43,8 @@ this feature and win over looser wording elsewhere in its documents.
 - **Conventions model** — the provider + model chosen for the «Conventions» feature in Settings
   (feature models).
 - **Conventions skill** — a skill of type *convention* and source *extracted*, assembled from the
-  accepted candidates of a repo. It belongs to that repo — at most one per repo — and is applied
-  only to reviews of that repo's pull requests. Default name `repo-conventions`; created
-  disabled. Saving again from the same repo updates it as a new version.
+  accepted candidates of a repo. Default name `repo-conventions`; created disabled. It is
+  identified by its name + source: saving again with the same name updates it as a new version.
+  Like any skill, it applies wherever it is linked (not limited to its repo).
 - **Skill** — a reusable markdown rule block linked to reviewer agents and added to their prompt
   as instructions (see `docs/features/skills/spec.md`).
