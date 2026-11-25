@@ -20,7 +20,7 @@
         "docs/features/conventions-extractor/migrations/"
       ],
       "file": "docs/features/conventions-extractor/tasks/t01-promote-conventions-migration.md",
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "T2",

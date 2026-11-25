@@ -8,7 +8,7 @@
 
 | # | Task | Layer | Owner | Estimate | Blocked by | Status | Step |
 |---|---|---|---|---|---|---|---|
-| T1 | Promote the conventions review-status migration into the Drizzle schema | migration | Oleksii B | S | — | todo | — |
+| T1 | Promote the conventions review-status migration into the Drizzle schema | migration | Oleksii B | S | — | done | COMMIT |
 | T2 | Update the conventions and skill contracts in both vendored copies | domain | Oleksii B | S | — | todo | — |
 | T3 | Add the conventions domain: types, errors, ports, candidate normalisation and evidence verification | domain | Oleksii B | M | — | todo | — |
 | T4 | Add the secret filter, repeat suppression and run limits to the conventions domain | domain | Oleksii B | M | — | todo | — |

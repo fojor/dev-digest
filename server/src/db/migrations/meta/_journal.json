@@ -99,6 +99,20 @@
       "when": 1795633301380,
       "tag": "0013_skills_phase2",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795646907609,
+      "tag": "0014_conventions_review_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1795646912539,
+      "tag": "0015_conventions_drop_accepted",
+      "breakpoints": true
     }
   ]
 }
