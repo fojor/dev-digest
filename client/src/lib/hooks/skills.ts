@@ -103,10 +103,12 @@ export interface SkillInput {
   type: SkillType;
   body: string;
   enabled?: boolean;
-  /** "imported" when saved from the import preview. */
-  source?: "manual" | "imported";
+  /** "imported" when saved from the import preview; "extracted" from the Conventions page. */
+  source?: "manual" | "imported" | "extracted";
   /** File the import preview read (recorded in the first version's note). */
   source_file?: string;
+  /** Evidence paths of the conventions an extracted skill was assembled from. */
+  evidence_files?: string[];
 }
 
 export function useCreateSkill() {
@@ -123,6 +125,7 @@ export interface UpdateSkillInput {
   patch: Partial<Pick<Skill, "name" | "description" | "type" | "body" | "enabled">> & {
     /** Optional "What changed?" note for the version a content edit records. */
     note?: string;
+    evidence_files?: string[];
   };
 }
 

@@ -64,5 +64,35 @@
     "ruleLimit": "The rule must be between 1 and {max} characters.",
     "copyFragment": "Copy fragment",
     "copied": "Fragment copied"
+  },
+  "modal": {
+    "title": "Create skill from conventions",
+    "subtitle": "Merged from {count, plural, one {# accepted convention} other {# accepted conventions}} in {repo}. Everything below is editable before you save.",
+    "trust": "These rules come from repository content and will become instructions for reviewer agents. Check that no rule tells agents to skip or ignore a class of problems.",
+    "updateWarning": "Updates existing {name} to v{next} — v{current} stays in its history.",
+    "name": "Name",
+    "nameHint": "A slug — lowercase letters, digits and dashes.",
+    "description": "Description",
+    "enabled": "Enabled",
+    "enabledHint": "Off by default — review the merged body before it reaches an agent's prompt.",
+    "body": "Skill body (Markdown)",
+    "footerCreate": "Saved as v1 · added to Skills Lab",
+    "footerUpdate": "Saved as v{next} · previous content kept in history",
+    "cancel": "Cancel",
+    "create": "Create skill",
+    "update": "Update skill",
+    "saved": "Saved — find it in Skills Lab",
+    "saveError": "Could not save the skill",
+    "scanning": "A scan is in progress — try again when it ends.",
+    "errors": {
+      "nameRequired": "Name is required.",
+      "nameSlug": "Use a slug — lowercase letters, digits and dashes.",
+      "nameMax": "Name must be at most {max} characters.",
+      "nameTaken": "A skill named {name} already exists — choose another name.",
+      "descriptionRequired": "Description is required.",
+      "descriptionMax": "Description must be at most {max} characters.",
+      "bodyRequired": "Body is required.",
+      "bodyMax": "Body must be at most {max} characters."
+    }
   }
 }

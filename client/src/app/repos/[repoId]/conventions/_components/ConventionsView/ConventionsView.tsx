@@ -14,6 +14,7 @@ import { useActiveRepo, useRepoNotFound } from "@/lib/repo-context";
 import { useConventions, useExtractConventions } from "@/lib/hooks/conventions";
 import { useToast } from "@/lib/toast";
 import { CandidateCard } from "../CandidateCard";
+import { CreateSkillModal } from "../CreateSkillModal";
 import { RescanConfirm } from "../RescanConfirm";
 import { acceptedCount, errorKey, isRepoNotFound, pendingStats, scanAgo } from "./helpers";
 import { s } from "./styles";
@@ -31,6 +32,7 @@ export function ConventionsView() {
   const toast = useToast();
 
   const [confirming, setConfirming] = React.useState(false);
+  const [creating, setCreating] = React.useState(false);
   const [runError, setRunError] = React.useState<unknown>(null);
 
   const repoName = repos.find((r) => r.id === repoId)?.full_name ?? t("page.repoFallback");
@@ -138,7 +140,7 @@ export function ConventionsView() {
             <Button icon="RefreshCw" onClick={onRescan} disabled={scanning} loading={scanning}>
               {scanning ? t("page.scanning") : t("page.rescan")}
             </Button>
-            <Button kind="primary" icon="Sparkles" disabled={scanning || accepted === 0}>
+            <Button kind="primary" icon="Sparkles" disabled={scanning || accepted === 0} onClick={() => setCreating(true)}>
               {t("page.createSkill")}
             </Button>
             {accepted === 0 && <span style={s.hint}>{t("page.createSkillUnavailable")}</span>}
@@ -146,6 +148,7 @@ export function ConventionsView() {
         )}
       </div>
       {body}
+      {creating && <CreateSkillModal repoId={repoId} repoName={repoName} onClose={() => setCreating(false)} />}
       {confirming && (
         <RescanConfirm pending={pending} edited={edited} onCancel={() => setConfirming(false)} onConfirm={startRun} />
       )}

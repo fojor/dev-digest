@@ -20,7 +20,7 @@
 | T10 | Expose the conventions routes and wire the module | ports | Oleksii B | M | T2, T8 | done | COMMIT |
 | T11 | Build the Conventions page, its hooks, the sidebar entry and the re-scan confirmation | ui | Oleksii B | L | T10 | done | COMMIT |
 | T12 | Build the candidate card with evidence, accept/reject and inline rule editing | ui | Oleksii B | M | T11 | done | COMMIT |
-| T13 | Build the Create skill modal with create/update, warnings and validation | ui | Oleksii B | M | T7, T9, T11 | todo | — |
+| T13 | Build the Create skill modal with create/update, warnings and validation | ui | Oleksii B | M | T7, T9, T11 | done | COMMIT |
 | T15 | Prove the conventions skill reaches the review prompt and document the routes | tests | Oleksii B | S | T7, T10 | done | COMMIT |
 
 **Total:** 14 tasks, ~10 person-days (S = 0.5, M = 1, L = 1 day at the upper bound).

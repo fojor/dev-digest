@@ -299,7 +299,7 @@
         "client/messages/en/conventions.json"
       ],
       "file": "docs/features/conventions-extractor/tasks/t13-create-skill-modal.md",
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "T15",

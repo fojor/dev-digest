@@ -137,6 +137,14 @@ describe("ConventionsView — SCR-01 states", () => {
     expect(screen.getByText("Accept at least one candidate first")).toBeInTheDocument();
   });
 
+  it("Create skill opens the skill modal (AC-15)", () => {
+    list = { data: { scan: SCAN, scanning: false, candidates: [cand({ status: "accepted" })] } };
+    renderView();
+    expect(screen.queryByTestId("create-skill-modal")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Create skill/ }));
+    expect(screen.getByTestId("create-skill-modal")).toBeInTheDocument();
+  });
+
   it("a re-scan that stored nothing new shows the notice (AC-07)", () => {
     list = { data: { scan: SCAN, scanning: false, candidates: [cand({ status: "accepted" })] } };
     extractMutate.mockImplementation((_v: unknown, o: { onSuccess: (r: ExtractionResult) => void }) =>
