@@ -59,7 +59,8 @@ Decisions taken in the interview and from the mockups (owner, 2026-11-25):
   again; if pending candidates exist the Developer confirms the replacement first.
 - Only the rule text of a candidate is editable; evidence, category and confidence are read-only.
 - The conventions skill's default name is `repo-conventions`. Saving with the name of an
-  existing *extracted* skill updates that skill as a new version (the modal warns first),
+  existing *extracted* skill updates that skill as a new version (the modal warns first; an
+  extracted match wins over a manual or imported skill with the same name),
   overwriting any hand edits made in Skills Lab since the last save (they stay in the version
   history); otherwise a new skill is created. A new skill is disabled until the Developer enables
   it. Like every skill, it applies wherever it is linked — it is not limited to its repo. Linking
@@ -157,15 +158,21 @@ Decisions taken in the interview and from the mockups (owner, 2026-11-25):
 
 ### AC-02 (US-01) — cross-context
 
-**Given** a repo that has been connected but whose code index has not been built yet
+**Given** a connected repo with no sample files to analyse — its code index has not been built yet, is still being built, failed, or is turned off, or every indexed file is excluded from the sample
 **When** the Developer runs extraction
-**Then** the system blocks the run before any model is asked, and tells the Developer that the repo must be indexed first
+**Then** the system blocks the run before any model is asked, and tells the Developer why — the repo must be indexed first, or it has no source files to analyse
 
 ### AC-03 (US-01) — error
 
 **Given** a Developer runs extraction on an indexed repo
-**When** the conventions model is unavailable, has no credentials, or returns an answer that does not match the candidate shape
-**Then** the system stores nothing, shows that extraction failed with the reason in plain language, and keeps the candidates the repo had before the run
+**When** the conventions model is unavailable, has no credentials, does not answer within 120 seconds, or returns an answer that cannot be read as a list of candidates — or the server restarts during the run
+**Then** the system stores nothing, shows that extraction failed with the reason in plain language, keeps the candidates the repo had before the run and the record of its last successful run, and the repo is no longer marked as scanning, so a new run can start
+
+### AC-03b (US-01) — error: partly invalid candidates
+
+**Given** the conventions model answers with a readable list of candidates
+**When** some candidates break the field limits (rule text over 1000 characters, category over 40, confidence outside 0–100 %) or miss a required field
+**Then** over-long rule text and category are cut to their limit and confidence is clamped into 0–100 %; a candidate missing a required field is discarded and counted as discarded in the run's log; the remaining candidates go through evidence verification and are stored as usual — only an answer that cannot be read as a list of candidates at all fails the whole run as in AC-03
 
 ### AC-04 (US-01) — domain invariant: one run per repo
 
@@ -173,17 +180,23 @@ Decisions taken in the interview and from the mockups (owner, 2026-11-25):
 **When** the Developer starts another run for the same repo (second tab, double click)
 **Then** the system refuses the second run and tells the Developer a scan is already running
 
+### AC-04b (US-01) — domain invariant: read-only while scanning
+
+**Given** an extraction run is in progress for a repo
+**When** the Developer tries to accept, reject or edit a candidate of that repo, or to create a skill from it (from any tab)
+**Then** the system refuses the change and says a scan is in progress; the candidates can still be viewed, and curation becomes available again once the run ends
+
 ### AC-05 (US-02) — domain invariant: evidence is verified
 
 **Given** the conventions model proposes candidates during a run
-**When** a candidate's evidence file is not one of the files analysed in this run, does not exist in the repo, or does not contain the quoted fragment (ignoring differences in whitespace and line endings), or the fragment does not contain at least one complete non-blank line of that file
-**Then** the candidate is discarded before it is stored, and the Developer only ever sees candidates with verified evidence; for a kept candidate the system records the line range where the fragment was found
+**When** a candidate's evidence file is not one of the files analysed in this run (its sample files or allow-listed style configs), does not exist in the repo, or does not contain the quoted fragment (ignoring differences in whitespace and line endings), or the fragment does not contain at least one complete non-blank line of that file
+**Then** the candidate is discarded before it is stored, and the Developer only ever sees candidates with verified evidence; for a kept candidate the system records the line range of the fragment's first occurrence in that file
 
 ### AC-06 (US-02) — happy path
 
 **Given** a repo with stored candidates
 **When** the Developer opens its Conventions page
-**Then** the header shows the full repo name, how many sample files the last run analysed and how long ago it ran, and how many candidates are accepted out of the total; each card shows the rule text, its category, its status if decided, the evidence file with its line range, the quoted fragment, and the confidence as a percentage with a bar
+**Then** the header shows the full repo name, how many sample files the last successful run analysed (style configs not counted) and how long ago it ran, and how many candidates are accepted out of the total; each card shows the rule text, its category, its status if decided, the evidence file with its line range, the quoted fragment, and the confidence as a percentage with a bar
 
 ### AC-07 (US-02) — empty state
 
@@ -225,19 +238,19 @@ Decisions taken in the interview and from the mockups (owner, 2026-11-25):
 
 **Given** a repo with accepted, rejected and pending candidates
 **When** the Developer re-scans and confirms the replacement
-**Then** all accepted and rejected candidates stay unchanged (including edited text and status), the pending ones are replaced by the new run's verified candidates, and a new candidate whose rule text equals an accepted or rejected rule (ignoring case and whitespace) is discarded; repeats in other words are avoided by the model on a best-effort basis only
+**Then** all accepted and rejected candidates stay unchanged (including edited text and status), the pending ones — including pending ones whose rule text the Developer edited — are replaced by the new run's verified candidates, and a new candidate whose rule text equals either the current (possibly edited) text or the originally proposed text of an accepted or rejected candidate (ignoring case and whitespace) is discarded — both texts are also what the model is told not to repeat; repeats in other words are avoided by the model on a best-effort basis only
 
 ### AC-14 (US-05) — happy path: confirm before replacing
 
 **Given** a repo with at least one pending candidate
 **When** the Developer clicks Re-scan
-**Then** the system first asks the Developer to confirm that the N pending candidates will be replaced, and cancelling leaves everything as it was; with no pending candidates the re-scan starts without asking
+**Then** the system first asks the Developer to confirm that the N pending candidates will be replaced — saying how many of them have edited rule text that will be lost, and that accepting a candidate keeps it — and cancelling leaves everything as it was; with no pending candidates the re-scan starts without asking
 
 ### AC-15 (US-06) — happy path
 
 **Given** a repo with at least one accepted candidate
 **When** the Developer chooses Create skill
-**Then** a modal opens that says how many accepted conventions it was merged from and in which repo, and that everything is editable before saving; it is pre-filled with: name «repo-conventions»; description «N house conventions extracted from <owner/repo>»; enabled switched off, with a hint to review the body before it reaches an agent's prompt; and a markdown body that starts with a heading of the skill name and an instruction to flag changes that violate any rule below and cite the offending file and line, followed by one section per category holding each accepted rule of that category and the file and line range it was detected in
+**Then** a modal opens that says how many accepted conventions it was merged from and in which repo, and that everything is editable before saving; it is pre-filled with: name «repo-conventions»; description «N house conventions extracted from <owner/repo>»; enabled switched off, with a hint to review the body before it reaches an agent's prompt; and a markdown body that starts with a heading of the skill name and an instruction to flag changes that violate any rule below and cite the offending file and line, followed by one section per category — categories that differ only in letter case or spacing share one section, sections in alphabetical order — holding each accepted rule of that category, highest confidence first, with the file and line range it was detected in
 
 ### AC-16 (US-06) — domain invariant: nothing to assemble
 
@@ -248,7 +261,7 @@ Decisions taken in the interview and from the mockups (owner, 2026-11-25):
 ### AC-17 (US-06) — error
 
 **Given** the Create skill modal is open
-**When** the Developer clears the name, the description or the body, enters a name that is not a slug (lowercase letters, digits and dashes), or exceeds the skill limits (name 1–100, description up to 1000, body 1–50 000 characters, as for every skill), and tries to save
+**When** the Developer clears the name, the description or the body, enters a name that is not a slug (lowercase letters, digits and dashes), or exceeds the skill limits (name 1–100, description up to 1000, body 1–50 000 characters, as for every skill), and tries to save — the slug rule and the required description apply to this modal only; the rules for other skills do not change
 **Then** the system blocks the save and marks the field with the rule it breaks, keeping everything else the Developer typed
 
 ### AC-18 (US-07) — happy path: create
@@ -259,13 +272,13 @@ Decisions taken in the interview and from the mockups (owner, 2026-11-25):
 
 ### AC-19 (US-07) — happy path: update existing
 
-**Given** the workspace already has an extracted skill with the chosen name (from an earlier save, from another repo, or edited by hand in Skills Lab since)
+**Given** the workspace already has at least one extracted skill whose name matches the chosen name, ignoring case and surrounding spaces (from an earlier save, from another repo, or edited by hand in Skills Lab since) — even if a manual or imported skill with that name also exists; when several extracted skills match, the most recently updated one is the one updated
 **When** the modal opens or the name is changed to that name, and the Developer saves
 **Then** the modal warns beforehand that the existing skill will be updated to its next version and its previous content kept in its history, and saving replaces its name, description and body as a new version — hand edits are overwritten, not merged — while every agent link to it is kept; the enabled switch starts from the existing skill's current state, and the saved state is whatever the switch shows
 
 ### AC-20 (US-07) — domain invariant: no silent overwrite of other skills
 
-**Given** the workspace has a skill with the chosen name that was not created by the extractor (manual, imported)
+**Given** the workspace has a skill with the chosen name (ignoring case and surrounding spaces) that was not created by the extractor (manual, imported), and no extracted skill with that name
 **When** the Developer tries to save
 **Then** the system blocks the save and asks for a different name, leaving the other skill untouched
 
@@ -281,31 +294,32 @@ Decisions taken in the interview and from the mockups (owner, 2026-11-25):
 **When** the Developer runs a review with that agent
 **Then** the conventions skill's rules are part of the agent's skills block for that review, visible in the run's prompt assembly like any other skill; while the skill is still disabled, it is not
 
-### AC-24 (US-01) — domain invariant: no secrets leave or land
-
-**Given** a repo whose style configs or sample files contain credentials
-**When** the Developer runs extraction
-**Then** only the allow-listed style configs are read (environment files, package-manager auth files and CI files never are), and any candidate whose fragment matches a known credential pattern is discarded, so no credential is ever shown on the page or stored with a candidate
-
 ### AC-23 (US-06) — domain invariant: trust warning
 
 **Given** the Create skill modal is open
 **When** the Developer reviews the draft
 **Then** the modal warns that these rules were derived from repository content and will become instructions for reviewer agents, and asks the Developer to check that no rule tells agents to skip or ignore a class of problems
 
+### AC-24 (US-01) — domain invariant: no secrets leave or land
+
+**Given** a repo whose style configs or sample files contain credentials
+**When** the Developer runs extraction
+**Then** only the allow-listed style configs are read (environment files, package-manager auth files and CI files never are), and any candidate whose rule text, category or fragment matches a known credential pattern is discarded, so no credential is ever shown on the page or stored with a candidate
+
 ## 6. Non-functional requirements
 
 | Aspect | Target | Measurement |
 |---|---|---|
 | Extraction run duration, p95 (sampling + one model call + verification) | ≤ 90 s | server log timing per run, on the default cheap conventions model |
-| Model input size per run | ≤ 12 sample files + allow-listed style configs + the do-not-repeat list of accepted and rejected rules; each file truncated to ≤ 400 lines; total input ≤ 40 000 tokens — when over, sample files are shortened first, the do-not-repeat list is kept whole | tokenizer count logged per run |
+| Model input size per run | ≤ 12 sample files + allow-listed style configs + the do-not-repeat list of accepted and rejected rules; each file truncated to ≤ 400 lines; total input ≤ 40 000 tokens — when over, the lowest-ranked sample files are dropped whole first, the do-not-repeat list is kept whole | tokenizer count logged per run |
 | Model calls per run | exactly 1 | mock LLM call count in tests; run log |
 | Candidate list load, p95 | ≤ 300 ms for ≤ 50 candidates | API timing in dev logs |
 | Accept / reject / edit, p95 | ≤ 300 ms | API timing in dev logs |
 | Evidence accuracy | 100 % of stored candidates have verified evidence | unit test over verification + an assertion at store time |
 | Concurrency | ≤ 1 extraction run per repo at a time | integration test: a second concurrent run is refused |
-| Determinism of input | the same repo state and index produce the same sample set | unit test of sample selection |
+| Determinism of input | the same repo state and index produce the same sample set (files of equal importance rank ordered by path) | unit test of sample selection |
 | Field limits | rule text 1–1000 characters; category 1–40 characters | contract validation |
+| Candidates per run | ≤ 20 stored; when the model proposes more, the lowest-confidence ones are discarded first | unit test; proposed / stored counts in the run log |
 | Run observability | each run logs the model used, proposed / discarded / stored candidate counts and duration | server log line per run |
 
 ## 6.1 Security / privacy
@@ -370,5 +384,8 @@ local-first; there is no product analytics). Baseline 0 — new feature.
 ## 8. Open questions
 
 - [ ] Is the feature still size S now that it adds a schema change (candidate status, category and line range; last-scan facts on the repo) on top of a new module and new API? Default now: S, quick route. — owner: Oleksii B, due: before sdd:design (re-run classify-size if not)
+- [ ] Does the skills capability need extending so the extractor can save through it (accept the `extracted` source and a version kind for an extractor save), rather than the extractor writing skills directly? Default now: extend the skills capability; general skill validation stays as is. — owner: Tech Lead, due: before sdd:design
+- [ ] Where do the credential patterns used by AC-24 live, given the pre-PR self-review secret check is assistant tooling the server cannot import? Default now: copy them into the server with a test that keeps both lists in sync. — owner: Security Lead, due: before sdd:design
+- [ ] How does the existing conventions scaffolding change? Default now: the candidate review status replaces the `accepted` flag in both contract copies; the two-step conventions mock is retired (one model call per run); the skill's evidence-files field is filled with the evidence paths of the accepted candidates. — owner: Tech Lead, due: before sdd:design
 
 Resolved 2026-11-25 (owner): conventions skills are not limited to their repo (§3); the minimum evidence is one complete non-blank line (AC-05); hand edits in Skills Lab are overwritten on the next save and kept in history (AC-19).
