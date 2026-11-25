@@ -5,17 +5,48 @@
     "headingPrefix": "Conventions in ",
     "repoFallback": "repo",
     "subtitle": "Scan the cloned repo to surface house-rules — each backed by evidence you can turn into a Skill.",
+    "scanFacts": "Detected from {count, plural, one {# sample file} other {# sample files}} · last scan {ago}",
+    "acceptedOf": "{accepted} of {total} accepted",
     "scanning": "Scanning…",
     "rescan": "Re-scan",
     "runExtraction": "Run extraction",
+    "createSkill": "Create skill",
+    "createSkillUnavailable": "Accept at least one candidate first",
     "extractionFailed": "Extraction failed",
+    "candidatesUnchanged": "Your candidates are unchanged.",
+    "noNew": "No new conventions found",
     "loadError": "Could not load conventions.",
     "empty": {
       "title": "No conventions extracted yet",
       "body": "Scan the repo to surface house-rules — naming, error handling, structure — each backed by evidence you can turn into a Skill.",
+      "noneVerified": "No convention could be backed by evidence in the last scan. Run it again or index more of the repo.",
       "cta": "Run extraction"
     },
     "candidateCount": "{count, plural, one {# candidate} other {# candidates}} · grounded against sampled files"
+  },
+  "ago": {
+    "now": "just now",
+    "minutes": "{n}m ago",
+    "hours": "{n}h ago",
+    "days": "{n}d ago"
+  },
+  "errors": {
+    "timeout": "The conventions model did not answer within 120 seconds.",
+    "no_credentials": "The conventions model has no API key — add one in Settings.",
+    "model_unavailable": "The conventions model is unavailable right now.",
+    "unreadable_answer": "The conventions model returned an answer that could not be read.",
+    "not_indexed": "Index the repo first — extraction reads its code index.",
+    "no_sample_files": "The repo has no source files to analyse.",
+    "scan_in_progress": "A scan is already running for this repo.",
+    "generic": "Something went wrong."
+  },
+  "rescanConfirm": {
+    "title": "Re-scan conventions?",
+    "body": "{pending, plural, one {# pending candidate} other {# pending candidates}} will be replaced — {edited, plural, one {# of them has} other {# of them have}} edited text that will be lost.",
+    "bodyNoEdits": "{pending, plural, one {# pending candidate} other {# pending candidates}} will be replaced.",
+    "keepHint": "Accept a candidate to keep it.",
+    "cancel": "Cancel",
+    "confirm": "Re-scan"
   },
   "card": {
     "confidence": "Confidence",

@@ -248,7 +248,7 @@
         "client/messages/en/conventions.json"
       ],
       "file": "docs/features/conventions-extractor/tasks/t11-conventions-page.md",
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "T12",
