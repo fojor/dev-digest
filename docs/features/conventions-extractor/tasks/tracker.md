@@ -10,7 +10,7 @@
 |---|---|---|---|---|---|---|---|
 | T1 | Promote the conventions review-status migration into the Drizzle schema | migration | Oleksii B | S | — | done | COMMIT |
 | T2 | Update the conventions and skill contracts in both vendored copies | domain | Oleksii B | S | — | done | COMMIT |
-| T3 | Add the conventions domain: types, errors, ports, candidate normalisation and evidence verification | domain | Oleksii B | M | — | todo | — |
+| T3 | Add the conventions domain: types, errors, ports, candidate normalisation and evidence verification | domain | Oleksii B | M | — | done | COMMIT |
 | T4 | Add the secret filter, repeat suppression and run limits to the conventions domain | domain | Oleksii B | M | — | todo | — |
 | T5 | Implement the conventions repository with the replace-pending transaction | infra | Oleksii B | M | T1, T2, T3 | todo | — |
 | T6 | Build the extraction input and the single structured model call | infra | Oleksii B | M | T3, T4 | todo | — |

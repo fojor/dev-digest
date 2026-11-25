@@ -58,7 +58,7 @@
         "server/test/conventions-domain-verify.test.ts"
       ],
       "file": "docs/features/conventions-extractor/tasks/t03-conventions-domain-verification.md",
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "T4",
