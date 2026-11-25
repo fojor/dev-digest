@@ -37,7 +37,7 @@
         "client/src/vendor/shared/contracts/knowledge.ts"
       ],
       "file": "docs/features/conventions-extractor/tasks/t02-update-shared-contracts.md",
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "T3",

@@ -128,6 +128,8 @@ export const Skill = z.object({
   enabled: z.boolean(),
   version: z.number().int(),
   evidence_files: z.array(z.string()).nullish(),
+  /** Time of the latest version (list endpoint); absent elsewhere. */
+  updated_at: z.string().optional(),
 });
 export type Skill = z.infer<typeof Skill>;
 
@@ -233,15 +235,63 @@ export const CommunitySkill = z.object({
 export type CommunitySkill = z.infer<typeof CommunitySkill>;
 
 // ---- Conventions ----
+/** Review status of a candidate (ADR-0001) — replaces the old `accepted` flag. */
+export const ConventionStatus = z.enum(['pending', 'accepted', 'rejected']);
+export type ConventionStatus = z.infer<typeof ConventionStatus>;
+
+export const CONVENTION_RULE_MAX = 1000;
+export const CONVENTION_CATEGORY_MAX = 40;
+
 export const ConventionCandidate = z.object({
   id: z.string(),
-  rule: z.string(),
-  evidence_path: z.string(),
-  evidence_snippet: z.string(),
+  /** Current (possibly edited) rule text. */
+  rule: z.string().min(1).max(CONVENTION_RULE_MAX),
+  /** The rule as the model proposed it; never changes after the run. */
+  original_rule: z.string().min(1).max(CONVENTION_RULE_MAX),
+  category: z.string().min(1).max(CONVENTION_CATEGORY_MAX),
+  evidence_path: z.string().min(1),
+  evidence_snippet: z.string().min(1),
+  /** 1-based line range of the fragment's first occurrence in the file. */
+  evidence_start_line: z.number().int().min(1),
+  evidence_end_line: z.number().int().min(1),
   confidence: z.number().min(0).max(1),
-  accepted: z.boolean(),
+  status: ConventionStatus,
 });
 export type ConventionCandidate = z.infer<typeof ConventionCandidate>;
+
+/** Facts of the last successful extraction run (sample files, style configs not counted). */
+export const ConventionScan = z.object({
+  scanned_at: z.string(),
+  sample_count: z.number().int().min(0).max(12),
+});
+export type ConventionScan = z.infer<typeof ConventionScan>;
+
+export const ConventionList = z.object({
+  /** null = never scanned. */
+  scan: ConventionScan.nullable(),
+  /** True while an extraction runs for the repo — curation is read-only then. */
+  scanning: z.boolean(),
+  candidates: z.array(ConventionCandidate),
+});
+export type ConventionList = z.infer<typeof ConventionList>;
+
+export const ExtractionResult = ConventionList.extend({
+  /** Candidates stored by this run; 0 drives the «no new conventions» notice. */
+  new_count: z.number().int().min(0).max(20),
+});
+export type ExtractionResult = z.infer<typeof ExtractionResult>;
+
+/** Accept / reject / edit one candidate. Only the rule text and status are editable. */
+export const ConventionPatch = z
+  .object({
+    status: ConventionStatus.optional(),
+    rule: z.string().trim().min(1).max(CONVENTION_RULE_MAX).optional(),
+  })
+  .strict()
+  .refine((p) => p.status !== undefined || p.rule !== undefined, {
+    message: 'Provide status or rule',
+  });
+export type ConventionPatch = z.infer<typeof ConventionPatch>;
 
 // ---- Agents ----
 // 'openrouter' routes through the OpenAI-compatible API (OpenAIProvider with a
