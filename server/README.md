@@ -81,6 +81,7 @@ flowchart TB
   end
   subgraph Intel["Repo intelligence"]
     repoIntel["repo-intel<br/>/repos/:id/index-state · /resync"]
+    conventions["conventions<br/>/repos/:repoId/conventions · /repos/:repoId/conventions/extract<br/>/conventions/:conventionId"]
   end
   subgraph Platform["Platform"]
     settings["settings<br/>/settings · /providers"]
@@ -150,6 +151,19 @@ What the reviewer actually sends to the model is assembled in
   `GET /skills/stats` (cards) and `GET /skills/:id/stats` (30-day window). Content
   edits, create, import and `POST /skills/:id/versions/:v/restore` append full
   snapshots to `skill_versions` with a note and kind; history is append-only.
+- **Conventions skills are ordinary skills.** The Conventions page
+  (`modules/conventions`) runs ONE structured model call per extraction
+  (`ConventionExtraction`, the Settings «Conventions» model, aborted at 120 s)
+  over ≤ 12 ranked sample files + allow-listed root style configs, all wrapped as
+  `<untrusted>`; only candidates whose evidence is verified against those same
+  buffers are stored. `GET /repos/:repoId/conventions` lists them with the last
+  scan facts and a `scanning` flag; `POST …/extract` runs synchronously and is
+  refused (409) while a run for the repo is in flight — an in-process guard, so a
+  restart clears it; `PATCH /conventions/:id` accepts / rejects / edits the rule
+  text and is refused (409) while scanning. The client assembles the accepted
+  rules into a `convention` skill with `source: extracted` and saves it through
+  `POST /skills` / `PUT /skills/:id` — created disabled, so it reaches a prompt
+  only after it is enabled and linked like any other skill.
 - **Grounding is mandatory.** Every finding must cite a line that exists in the
   diff or it is dropped (`groundFindings`), and the score is recomputed from the
   surviving findings — the model's self-reported score is ignored.
