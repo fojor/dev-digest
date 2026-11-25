@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, max } from 'drizzle-orm';
 import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import type { SkillsRepository } from '../domain/ports.js';
@@ -15,11 +15,14 @@ export class DrizzleSkillsRepository implements SkillsRepository {
 
   async list(workspaceId: string): Promise<Skill[]> {
     const rows = await this.db
-      .select()
+      .select({ skill: t.skills, updatedAt: max(t.skillVersions.createdAt) })
       .from(t.skills)
+      .leftJoin(t.skillVersions, eq(t.skillVersions.skillId, t.skills.id))
       .where(eq(t.skills.workspaceId, workspaceId))
+      .groupBy(t.skills.id)
       .orderBy(asc(t.skills.name));
-    return rows.map(toSkill);
+    // updated_at = latest version time; a skill without history falls back to its creation.
+    return rows.map((r) => ({ ...toSkill(r.skill), updatedAt: r.updatedAt ?? r.skill.createdAt }));
   }
 
   async getById(workspaceId: string, id: string): Promise<Skill | undefined> {
@@ -41,6 +44,7 @@ export class DrizzleSkillsRepository implements SkillsRepository {
         source: input.source ?? 'manual',
         body: input.body,
         enabled: input.enabled ?? true,
+        evidenceFiles: input.evidenceFiles ?? null,
         version,
       })
       .returning();
@@ -56,6 +60,7 @@ export class DrizzleSkillsRepository implements SkillsRepository {
         type: skill.type,
         body: skill.body,
         enabled: skill.enabled,
+        evidenceFiles: skill.evidenceFiles,
         version: skill.version,
       })
       .where(and(eq(t.skills.workspaceId, skill.workspaceId), eq(t.skills.id, skill.id)))

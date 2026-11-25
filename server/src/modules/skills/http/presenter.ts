@@ -28,6 +28,7 @@ export function presentSkill(s: Skill): SkillDto {
     enabled: s.enabled,
     version: s.version,
     evidence_files: s.evidenceFiles,
+    ...(s.updatedAt ? { updated_at: s.updatedAt.toISOString() } : {}),
   };
 }
 
@@ -53,6 +54,7 @@ export function toNewSkill(body: CreateSkillBody, ctx: { workspaceId: string }):
     source: body.source ?? 'manual',
     enabled: body.enabled,
     sourceFile: body.source_file,
+    evidenceFiles: body.evidence_files,
   };
 }
 
@@ -63,6 +65,7 @@ export function toSkillPatch(body: UpdateSkillBody): SkillPatch {
     type: body.type,
     body: body.body,
     enabled: body.enabled,
+    evidenceFiles: body.evidence_files,
   };
 }
 

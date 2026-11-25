@@ -4,6 +4,8 @@ import { SkillType } from '@devdigest/shared';
 const Name = z.string().trim().min(1).max(100);
 const Description = z.string().trim().max(1000);
 const Body = z.string().min(1).max(50_000);
+/** Evidence paths of the accepted conventions a skill was assembled from. */
+const EvidenceFiles = z.array(z.string().trim().min(1).max(500)).max(20);
 
 export const CreateSkillBody = z.object({
   name: Name,
@@ -11,10 +13,11 @@ export const CreateSkillBody = z.object({
   type: SkillType,
   body: Body,
   enabled: z.boolean().optional(),
-  /** 'imported' when saved from the import preview; manual otherwise. */
-  source: z.enum(['manual', 'imported']).optional(),
+  /** 'imported' from the import preview, 'extracted' from the conventions modal; manual otherwise. */
+  source: z.enum(['manual', 'imported', 'extracted']).optional(),
   /** Import save: the file the core came from (recorded in the version note). */
   source_file: z.string().trim().max(255).optional(),
+  evidence_files: EvidenceFiles.optional(),
 });
 export type CreateSkillBody = z.infer<typeof CreateSkillBody>;
 
@@ -26,6 +29,7 @@ export const UpdateSkillBody = z.object({
   enabled: z.boolean().optional(),
   /** "What changed?" — the version note; empty → an auto note from the diff. */
   note: z.string().max(200).optional(),
+  evidence_files: EvidenceFiles.optional(),
 });
 export type UpdateSkillBody = z.infer<typeof UpdateSkillBody>;
 

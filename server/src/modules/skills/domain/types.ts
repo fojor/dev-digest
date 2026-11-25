@@ -17,6 +17,8 @@ export interface Skill {
   version: number;
   evidenceFiles: string[] | null;
   createdAt: Date;
+  /** Time of the latest version — filled by the list read only. */
+  updatedAt?: Date | null;
 }
 
 /** What a caller supplies to create a skill; omitted fields take defaults. */
@@ -30,10 +32,14 @@ export interface NewSkill {
   enabled?: boolean;
   /** For an import: the file the core came from (goes into the version note). */
   sourceFile?: string;
+  /** For an extracted skill: evidence paths of its conventions. */
+  evidenceFiles?: string[];
 }
 
 /** Fields an update may change. `undefined` = leave as is. */
-export type SkillPatch = Partial<Pick<Skill, 'name' | 'description' | 'type' | 'body' | 'enabled'>>;
+export type SkillPatch = Partial<
+  Pick<Skill, 'name' | 'description' | 'type' | 'body' | 'enabled'> & { evidenceFiles: string[] }
+>;
 
 /** An uploaded file to be previewed as a skill. Nothing is stored. */
 export interface SkillUpload {

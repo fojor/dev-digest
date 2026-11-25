@@ -142,7 +142,7 @@
         "server/test/skills-extracted.test.ts"
       ],
       "file": "docs/features/conventions-extractor/tasks/t07-skills-api-extracted-source.md",
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "T8",
