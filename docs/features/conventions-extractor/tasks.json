@@ -101,7 +101,7 @@
         "server/test/conventions-repository.test.ts"
       ],
       "file": "docs/features/conventions-extractor/tasks/t05-conventions-repository.md",
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "T6",
