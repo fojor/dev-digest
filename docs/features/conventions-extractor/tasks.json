@@ -219,7 +219,7 @@
         "server/test/conventions-routes.test.ts"
       ],
       "file": "docs/features/conventions-extractor/tasks/t10-conventions-routes-and-wiring.md",
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "T11",

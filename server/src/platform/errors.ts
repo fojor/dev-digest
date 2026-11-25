@@ -61,4 +61,8 @@ export const DOMAIN_STATUS: Readonly<Record<string, number>> = {
   pull_not_found: 404,
   github_unavailable: 400,
   github_comment_failed: 400,
+  conventions_repo_not_indexed: 409,
+  conventions_scan_in_progress: 409,
+  conventions_extraction_failed: 502,
+  convention_not_found: 404,
 };

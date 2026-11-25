@@ -56,6 +56,15 @@ export class DrizzleConventionsRepository implements ConventionsRepository {
     return { id: r.id, fullName: r.fullName, scan };
   }
 
+  /** The repo's local clone (wiring for the sample source; not part of the port). */
+  async clonePath(repoId: string): Promise<string | null> {
+    const [r] = await this.db
+      .select({ clonePath: t.repos.clonePath })
+      .from(t.repos)
+      .where(eq(t.repos.id, repoId));
+    return r?.clonePath ?? null;
+  }
+
   async listByRepo(workspaceId: string, repoId: string): Promise<ConventionCandidateEntity[]> {
     const rows = await this.db
       .select()

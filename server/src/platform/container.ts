@@ -40,6 +40,10 @@ import { RepoIntelService } from '../modules/repo-intel/service.js';
 import { RepoIntelRepository } from '../modules/repo-intel/repository.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
+import { FEATURE_MODELS, type FeatureModelChoice, type FeatureModelId } from '@devdigest/shared';
+import { DrizzleSettingsRepository } from '../modules/settings/infrastructure/settings.repository.js';
+import { featureModelDefaults } from '../modules/settings/domain/policies.js';
+import { resolveFeatureModel } from '../modules/settings/application/feature-models.js';
 
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
@@ -247,6 +251,18 @@ export class Container {
     if (!token) throw new ConfigError('GITHUB_TOKEN is not configured');
     this._github = new OctokitGitHubClient(token);
     return this._github;
+  }
+
+  /**
+   * The provider + model a system LLM feature (conventions, onboarding, …) runs
+   * on: the workspace's Settings override, else the registry default.
+   */
+  async featureModel(workspaceId: string, id: FeatureModelId): Promise<FeatureModelChoice> {
+    return resolveFeatureModel(
+      { settings: new DrizzleSettingsRepository(this.db), defaults: featureModelDefaults(FEATURE_MODELS) },
+      workspaceId,
+      id,
+    );
   }
 
   /** Resolve an LLM provider by id; constructs from the secret key, cached. */
