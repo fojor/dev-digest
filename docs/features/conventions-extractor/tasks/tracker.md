@@ -19,7 +19,7 @@
 | T9 | Add the client helpers that build the skill draft and find the extracted name match | ui | Oleksii B | S | T2 | done | COMMIT |
 | T10 | Expose the conventions routes and wire the module | ports | Oleksii B | M | T2, T8 | done | COMMIT |
 | T11 | Build the Conventions page, its hooks, the sidebar entry and the re-scan confirmation | ui | Oleksii B | L | T10 | done | COMMIT |
-| T12 | Build the candidate card with evidence, accept/reject and inline rule editing | ui | Oleksii B | M | T11 | todo | — |
+| T12 | Build the candidate card with evidence, accept/reject and inline rule editing | ui | Oleksii B | M | T11 | done | COMMIT |
 | T13 | Build the Create skill modal with create/update, warnings and validation | ui | Oleksii B | M | T7, T9, T11 | todo | — |
 | T15 | Prove the conventions skill reaches the review prompt and document the routes | tests | Oleksii B | S | T7, T10 | done | COMMIT |
 

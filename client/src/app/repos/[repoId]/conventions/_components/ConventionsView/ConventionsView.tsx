@@ -7,12 +7,13 @@ import React from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import type { ExtractionResult } from "@devdigest/shared";
-import { Button, Card, EmptyState, ErrorState, Skeleton } from "@devdigest/ui";
+import { Button, EmptyState, ErrorState, Skeleton } from "@devdigest/ui";
 import { AppShell } from "@/components/app-shell";
 import { RepoNotFound } from "@/components/repo-not-found";
 import { useActiveRepo, useRepoNotFound } from "@/lib/repo-context";
 import { useConventions, useExtractConventions } from "@/lib/hooks/conventions";
 import { useToast } from "@/lib/toast";
+import { CandidateCard } from "../CandidateCard";
 import { RescanConfirm } from "../RescanConfirm";
 import { acceptedCount, errorKey, isRepoNotFound, pendingStats, scanAgo } from "./helpers";
 import { s } from "./styles";
@@ -104,9 +105,7 @@ export function ConventionsView() {
         {errorBanner}
         <div style={s.list}>
           {candidates.map((c) => (
-            <Card key={c.id} pad>
-              <p style={s.rule}>{c.rule}</p>
-            </Card>
+            <CandidateCard key={c.id} repoId={repoId} candidate={c} readOnly={scanning} />
           ))}
         </div>
       </>

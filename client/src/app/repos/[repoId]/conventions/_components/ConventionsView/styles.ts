@@ -9,5 +9,4 @@ export const s = {
   hint: { fontSize: 12, color: "var(--text-tertiary)" } as React.CSSProperties,
   list: { display: "flex", flexDirection: "column", gap: 12 } as React.CSSProperties,
   banner: { marginBottom: 16, border: "1px solid var(--border)", borderRadius: 10 } as React.CSSProperties,
-  rule: { fontSize: 14, margin: 0 } as React.CSSProperties,
 };

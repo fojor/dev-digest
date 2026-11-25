@@ -52,6 +52,17 @@
     "confidence": "Confidence",
     "accepted": "Accepted",
     "accepting": "Accepting…",
-    "acceptAsSkill": "Accept as Skill"
+    "acceptAsSkill": "Accept as Skill",
+    "confidencePct": "{pct}% confidence",
+    "accept": "Accept",
+    "reject": "Reject",
+    "rejected": "Rejected",
+    "editRule": "Edit rule",
+    "save": "Save",
+    "cancel": "Cancel",
+    "counter": "{n} / {max}",
+    "ruleLimit": "The rule must be between 1 and {max} characters.",
+    "copyFragment": "Copy fragment",
+    "copied": "Fragment copied"
   }
 }

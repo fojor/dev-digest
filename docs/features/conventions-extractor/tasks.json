@@ -271,7 +271,7 @@
         "client/messages/en/conventions.json"
       ],
       "file": "docs/features/conventions-extractor/tasks/t12-candidate-card.md",
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "T13",
