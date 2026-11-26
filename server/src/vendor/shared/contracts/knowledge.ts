@@ -217,8 +217,9 @@ export type AgentVersionConfig = z.infer<typeof AgentVersionConfig>;
 
 export const AgentVersion = z.object({
   agent_id: z.string(),
-  version: z.number().int(),
+  revision: z.number().int(),
   config: AgentVersionConfig,
-  created_at: z.string(),
+  /** Unix epoch, milliseconds. */
+  created_at: z.number().int(),
 });
 export type AgentVersion = z.infer<typeof AgentVersion>;

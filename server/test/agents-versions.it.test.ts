@@ -24,7 +24,7 @@ if (!hasDocker) {
  * appends v2 (newest-first), single-version fetch, and the 404s (unknown agent,
  * unknown version, cross-workspace).
  */
-d('GET /agents/:id/versions', () => {
+d('GET /agents/:id/revisions', () => {
   let pg: PgFixture;
 
   beforeAll(async () => {
@@ -57,16 +57,16 @@ d('GET /agents/:id/versions', () => {
     expect(created.statusCode).toBe(201);
     const agentId = created.json().id as string;
 
-    const res = await app.inject({ method: 'GET', url: `/agents/${agentId}/versions` });
+    const res = await app.inject({ method: 'GET', url: `/agents/${agentId}/revisions?limit=10` });
     expect(res.statusCode).toBe(200);
     const versions = res.json();
     expect(versions).toHaveLength(1);
     expect(versions[0]).toMatchObject({
       agent_id: agentId,
-      version: 1,
+      revision: 1,
       config: { provider: 'openai', model: 'gpt-4o-mini', system_prompt: 'Review the diff.' },
     });
-    expect(typeof versions[0].created_at).toBe('string');
+    expect(typeof versions[0].created_at).toBe('number');
     await app.close();
   });
 
@@ -86,9 +86,9 @@ d('GET /agents/:id/versions', () => {
     expect(updated.json().version).toBe(2);
 
     const versions = (
-      await app.inject({ method: 'GET', url: `/agents/${agentId}/versions` })
+      await app.inject({ method: 'GET', url: `/agents/${agentId}/revisions?limit=10` })
     ).json();
-    expect(versions.map((v: { version: number }) => v.version)).toEqual([2, 1]);
+    expect(versions.map((v: { revision: number }) => v.revision)).toEqual([2, 1]);
     expect(versions[0].config.model).toBe('gpt-4o');
     expect(versions[1].config.model).toBe('gpt-4o-mini');
     await app.close();
@@ -103,22 +103,22 @@ d('GET /agents/:id/versions', () => {
     await app.inject({ method: 'PUT', url: `/agents/${agentId}`, payload: { enabled: false } });
 
     const versions = (
-      await app.inject({ method: 'GET', url: `/agents/${agentId}/versions` })
+      await app.inject({ method: 'GET', url: `/agents/${agentId}/revisions?limit=10` })
     ).json();
     expect(versions).toHaveLength(1);
     await app.close();
   });
 
-  it('GET /agents/:id/versions/:version returns one snapshot', async () => {
+  it('GET /agents/:id/revisions/:revision returns one snapshot', async () => {
     const app = await makeApp();
     const agentId = (
       await app.inject({ method: 'POST', url: '/agents', payload: createBody })
     ).json().id as string;
     await app.inject({ method: 'PUT', url: `/agents/${agentId}`, payload: { model: 'gpt-4o' } });
 
-    const v1 = await app.inject({ method: 'GET', url: `/agents/${agentId}/versions/1` });
+    const v1 = await app.inject({ method: 'GET', url: `/agents/${agentId}/revisions/1` });
     expect(v1.statusCode).toBe(200);
-    expect(v1.json()).toMatchObject({ version: 1, config: { model: 'gpt-4o-mini' } });
+    expect(v1.json()).toMatchObject({ revision: 1, config: { model: 'gpt-4o-mini' } });
     await app.close();
   });
 
@@ -130,23 +130,23 @@ d('GET /agents/:id/versions', () => {
     const ghost = '00000000-0000-0000-0000-000000000000';
 
     expect(
-      (await app.inject({ method: 'GET', url: `/agents/${ghost}/versions` })).statusCode,
+      (await app.inject({ method: 'GET', url: `/agents/${ghost}/revisions?limit=10` })).statusCode,
     ).toBe(404);
     expect(
-      (await app.inject({ method: 'GET', url: `/agents/${ghost}/versions/1` })).statusCode,
+      (await app.inject({ method: 'GET', url: `/agents/${ghost}/revisions/1` })).statusCode,
     ).toBe(404);
     expect(
-      (await app.inject({ method: 'GET', url: `/agents/${agentId}/versions/99` })).statusCode,
+      (await app.inject({ method: 'GET', url: `/agents/${agentId}/revisions/99` })).statusCode,
     ).toBe(404);
     await app.close();
   });
 
-  it('a non-numeric :version is rejected at the edge (422, not 404)', async () => {
+  it('a non-numeric :revision is rejected at the edge (422, not 404)', async () => {
     const app = await makeApp();
     const agentId = (
       await app.inject({ method: 'POST', url: '/agents', payload: createBody })
     ).json().id as string;
-    const res = await app.inject({ method: 'GET', url: `/agents/${agentId}/versions/abc` });
+    const res = await app.inject({ method: 'GET', url: `/agents/${agentId}/revisions/abc` });
     expect(res.statusCode).toBe(422);
     await app.close();
   });

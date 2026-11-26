@@ -35,9 +35,9 @@ export function toAgentDto(row: AgentRow): Agent {
 export function toAgentVersionDto(row: AgentVersionRow): AgentVersion {
   return {
     agent_id: row.agentId,
-    version: row.version,
+    revision: row.version,
     config: AgentVersionConfig.parse(row.configJson),
-    created_at: row.createdAt.toISOString(),
+    created_at: row.createdAt.getTime(),
   };
 }
 
