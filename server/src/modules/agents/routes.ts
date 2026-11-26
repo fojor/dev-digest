@@ -10,10 +10,15 @@ import { AgentsService } from './service.js';
 /** `/providers/:id` addresses a provider by name, not a uuid. */
 const ProviderParams = z.object({ id: Provider });
 
-/** `/agents/:id/versions/:version` — id is a uuid, version a positive integer. */
-const VersionParams = z.object({
+/** `/agents/:id/revisions/:revision` — id is a uuid, revision a positive integer. */
+const RevisionParams = z.object({
   id: z.string().uuid(),
-  version: z.coerce.number().int().positive(),
+  revision: z.coerce.number().int().positive(),
+});
+
+/** `/agents/:id/revisions?limit=N` — how many snapshots to return, newest first. */
+const RevisionsQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(100),
 });
 
 /**
@@ -22,8 +27,8 @@ const VersionParams = z.object({
  *   GET    /agents/:id              → one agent
  *   POST   /agents                  → create
  *   PUT    /agents/:id              → update / toggle enabled (versions config)
- *   GET    /agents/:id/versions     → config history (newest first)
- *   GET    /agents/:id/versions/:version → one config snapshot
+ *   GET    /agents/:id/revisions?limit=N → config history (newest first)
+ *   GET    /agents/:id/revisions/:revision → one config snapshot
  *   GET    /agents/:id/skills       → linked skills (ordered)
  *   POST   /agents/:id/skills       → set/reorder linked skills OR link one
  *   GET    /agents/:id/models       → dynamic model list for the agent's provider
@@ -124,21 +129,25 @@ export default async function agentsRoutes(appBase: FastifyInstance) {
     return { ok: true };
   });
 
-  app.get('/agents/:id/versions', { schema: { params: IdParams } }, async (req) => {
-    const { workspaceId } = await getContext(app.container, req);
-    const versions = await service.listVersions(workspaceId, req.params.id);
-    if (!versions) throw new NotFoundError('Agent not found');
-    return versions;
-  });
-
   app.get(
-    '/agents/:id/versions/:version',
-    { schema: { params: VersionParams } },
+    '/agents/:id/revisions',
+    { schema: { params: IdParams, querystring: RevisionsQuery } },
     async (req) => {
       const { workspaceId } = await getContext(app.container, req);
-      const version = await service.getVersion(workspaceId, req.params.id, req.params.version);
-      if (!version) throw new NotFoundError('Agent version not found');
-      return version;
+      const revisions = await service.listVersions(workspaceId, req.params.id);
+      if (!revisions) throw new NotFoundError('Agent not found');
+      return revisions.slice(0, req.query.limit);
+    },
+  );
+
+  app.get(
+    '/agents/:id/revisions/:revision',
+    { schema: { params: RevisionParams } },
+    async (req) => {
+      const { workspaceId } = await getContext(app.container, req);
+      const revision = await service.getVersion(workspaceId, req.params.id, req.params.revision);
+      if (!revision) throw new NotFoundError('Agent revision not found');
+      return revision;
     },
   );
 
