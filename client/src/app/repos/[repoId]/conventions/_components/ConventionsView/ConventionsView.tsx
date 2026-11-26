@@ -116,38 +116,53 @@ export function ConventionsView() {
 
   return (
     <AppShell crumb={crumb}>
-      <div style={s.pageHeader}>
-        <div>
-          <h1 style={s.title}>
-            {t("page.headingPrefix")}
-            <span className="mono">{repoName}</span>
-          </h1>
-          <p style={s.subtitle}>
-            {data?.scan
-              ? t("page.scanFacts", {
-                  count: data.scan.sample_count,
-                  ago: (() => {
-                    const a = scanAgo(data.scan.scanned_at, Date.now());
-                    return t(`ago.${a.key}`, { n: a.n });
-                  })(),
-                })
-              : t("page.subtitle")}
-          </p>
+      <div style={s.page}>
+        <div style={s.pageHeader}>
+          <div>
+            <h1 style={s.title}>
+              {t("page.headingPrefix")}
+              <span className="mono" style={s.repoName}>
+                {repoName}
+              </span>
+            </h1>
+            <p style={s.subtitle}>
+              {data?.scan
+                ? t("page.scanFacts", {
+                    count: data.scan.sample_count,
+                    ago: (() => {
+                      const a = scanAgo(data.scan.scanned_at, Date.now());
+                      return t(`ago.${a.key}`, { n: a.n });
+                    })(),
+                  })
+                : t("page.subtitle")}
+            </p>
+          </div>
+          {candidates.length > 0 && (
+            <div style={s.headerActions}>
+              <Button icon="RefreshCw" onClick={onRescan} disabled={scanning} loading={scanning}>
+                {scanning ? t("page.scanning") : t("page.rescan")}
+              </Button>
+            </div>
+          )}
         </div>
         {candidates.length > 0 && (
-          <div style={s.actions}>
+          <div style={s.toolbar}>
             <span style={s.accepted}>{t("page.acceptedOf", { accepted, total: candidates.length })}</span>
-            <Button icon="RefreshCw" onClick={onRescan} disabled={scanning} loading={scanning}>
-              {scanning ? t("page.scanning") : t("page.rescan")}
-            </Button>
-            <Button kind="primary" icon="Sparkles" disabled={scanning || accepted === 0} onClick={() => setCreating(true)}>
-              {t("page.createSkill")}
-            </Button>
-            {accepted === 0 && <span style={s.hint}>{t("page.createSkillUnavailable")}</span>}
+            <div style={s.toolbarEnd}>
+              {accepted === 0 && <span style={s.hint}>{t("page.createSkillUnavailable")}</span>}
+              <Button
+                kind="primary"
+                icon="Sparkles"
+                disabled={scanning || accepted === 0}
+                onClick={() => setCreating(true)}
+              >
+                {t("page.createSkill")}
+              </Button>
+            </div>
           </div>
         )}
+        {body}
       </div>
-      {body}
       {creating && <CreateSkillModal repoId={repoId} repoName={repoName} onClose={() => setCreating(false)} />}
       {confirming && (
         <RescanConfirm pending={pending} edited={edited} onCancel={() => setConfirming(false)} onConfirm={startRun} />
