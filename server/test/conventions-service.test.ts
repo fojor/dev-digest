@@ -211,15 +211,19 @@ describe('ConventionsService (T8)', () => {
   it('a second concurrent run is refused; changes are refused while scanning, reads still work (AC-04, AC-04b)', async () => {
     const c = db.seed('Decide me', 'pending');
     let release!: () => void;
+    let started!: () => void;
+    // Wait until the run is actually inside the LLM call — a fixed timeout is flaky under load.
+    const entered = new Promise<void>((r) => (started = r));
     const slow = new MockLLMProvider();
     const real = mock([good('Use the shared client')]);
     slow.completeStructured = async (req) => {
+      started();
       await new Promise<void>((r) => (release = r));
       return real.completeStructured(req);
     };
     const svc = service(slow);
     const first = svc.extract(WS, REPO);
-    await new Promise((r) => setTimeout(r, 10));
+    await entered;
 
     await expect(svc.extract(WS, REPO)).rejects.toBeInstanceOf(ExtractionInProgress);
     await expect(svc.updateCandidate(WS, c.id, { status: 'accepted' })).rejects.toBeInstanceOf(ExtractionInProgress);
