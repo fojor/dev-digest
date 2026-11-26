@@ -19,6 +19,7 @@ const cand = (o: Partial<ConventionCandidate> = {}): ConventionCandidate => {
     evidence_snippet: "export const api = client;",
     evidence_start_line: 3,
     evidence_end_line: 4,
+    evidence_commit_sha: null,
     confidence: 0.5,
     status: "accepted",
     ...o,

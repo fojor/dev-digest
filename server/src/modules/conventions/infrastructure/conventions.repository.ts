@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, ne } from 'drizzle-orm';
 import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import type { ConventionsRepo, ConventionsRepository } from '../domain/ports.js';
@@ -29,6 +29,7 @@ function toEntity(r: Row): ConventionCandidateEntity {
     evidenceSnippet: r.evidenceSnippet ?? '',
     evidenceStartLine: r.evidenceStartLine ?? 1,
     evidenceEndLine: r.evidenceEndLine ?? r.evidenceStartLine ?? 1,
+    evidenceCommitSha: r.evidenceCommitSha ?? null,
     confidence: r.confidence ?? 0,
   };
 }
@@ -56,6 +57,15 @@ export class DrizzleConventionsRepository implements ConventionsRepository {
     return { id: r.id, fullName: r.fullName, scan };
   }
 
+  /** owner/name of the repo (wiring for the clone HEAD lookup; not part of the port). */
+  async repoRef(repoId: string): Promise<{ owner: string; name: string } | null> {
+    const [r] = await this.db
+      .select({ owner: t.repos.owner, name: t.repos.name })
+      .from(t.repos)
+      .where(eq(t.repos.id, repoId));
+    return r ?? null;
+  }
+
   /** The repo's local clone (wiring for the sample source; not part of the port). */
   async clonePath(repoId: string): Promise<string | null> {
     const [r] = await this.db
@@ -65,11 +75,26 @@ export class DrizzleConventionsRepository implements ConventionsRepository {
     return r?.clonePath ?? null;
   }
 
+  /**
+   * Only candidates that carry evidence (path + fragment) are listed — every
+   * convention on the page must be backed by real code. Legacy rows written
+   * before evidence was required stay in the table (and in the do-not-repeat
+   * list) but are never shown.
+   */
   async listByRepo(workspaceId: string, repoId: string): Promise<ConventionCandidateEntity[]> {
     const rows = await this.db
       .select()
       .from(t.conventions)
-      .where(and(eq(t.conventions.workspaceId, workspaceId), eq(t.conventions.repoId, repoId)))
+      .where(
+        and(
+          eq(t.conventions.workspaceId, workspaceId),
+          eq(t.conventions.repoId, repoId),
+          isNotNull(t.conventions.evidencePath),
+          ne(t.conventions.evidencePath, ''),
+          isNotNull(t.conventions.evidenceSnippet),
+          ne(t.conventions.evidenceSnippet, ''),
+        ),
+      )
       .orderBy(desc(t.conventions.confidence), asc(t.conventions.createdAt), asc(t.conventions.id));
     return rows.map(toEntity);
   }
@@ -101,9 +126,10 @@ export class DrizzleConventionsRepository implements ConventionsRepository {
     workspaceId: string;
     repoId: string;
     candidates: VerifiedCandidate[];
+    commitSha: string | null;
     scan: ScanFacts;
   }): Promise<void> {
-    const { workspaceId, repoId, candidates, scan } = input;
+    const { workspaceId, repoId, candidates, commitSha, scan } = input;
     await this.db.transaction(async (tx) => {
       await tx
         .delete(t.conventions)
@@ -127,6 +153,7 @@ export class DrizzleConventionsRepository implements ConventionsRepository {
             evidenceSnippet: c.evidenceSnippet,
             evidenceStartLine: c.evidenceStartLine,
             evidenceEndLine: c.evidenceEndLine,
+            evidenceCommitSha: commitSha,
             confidence: c.confidence,
           })),
         );

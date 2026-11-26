@@ -22,6 +22,7 @@ const CAND: ConventionCandidate = {
   evidence_snippet: "toast.error(error.message)",
   evidence_start_line: 25,
   evidence_end_line: 27,
+  evidence_commit_sha: "abc123",
   confidence: 0.6,
   status: "pending",
 };
@@ -31,11 +32,17 @@ beforeEach(() => {
   mutate.mockReset();
 });
 
-const renderCard = (o: Partial<ConventionCandidate> = {}, readOnly = false) =>
+const REPO = { full_name: "acme/shop", default_branch: "main" };
+
+const renderCard = (
+  o: Partial<ConventionCandidate> = {},
+  readOnly = false,
+  repo: { full_name: string; default_branch: string } | null = REPO,
+) =>
   render(
     <NextIntlClientProvider locale="en" messages={{ conventions }}>
       <ToastProvider>
-        <CandidateCard repoId="r1" candidate={{ ...CAND, ...o }} readOnly={readOnly} />
+        <CandidateCard repoId="r1" candidate={{ ...CAND, ...o }} readOnly={readOnly} repo={repo} />
       </ToastProvider>
     </NextIntlClientProvider>,
   );
@@ -129,5 +136,30 @@ describe("EvidenceSnippet", () => {
     expect(screen.getByText("client/src/context/AppContext.jsx:25")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Copy fragment" }));
     expect(writeText).toHaveBeenCalledWith("toast.error(error.message)");
+  });
+
+  it("the evidence header links to the lines on GitHub, pinned to the verified commit, in a new tab", () => {
+    renderCard();
+    const link = screen.getByRole("link", { name: /client\/src\/context\/AppContext\.jsx:25-27/ });
+    expect(link).toHaveAttribute(
+      "href",
+      "https://github.com/acme/shop/blob/abc123/client/src/context/AppContext.jsx#L25-L27",
+    );
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("without a verified commit the link falls back to the default branch", () => {
+    renderCard({ evidence_commit_sha: null, evidence_start_line: 25, evidence_end_line: 25 });
+    expect(screen.getByRole("link", { name: /AppContext\.jsx:25/ })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/shop/blob/main/client/src/context/AppContext.jsx#L25",
+    );
+  });
+
+  it("while the repo is unknown the header is plain text", () => {
+    renderCard({}, false, null);
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.getByText("client/src/context/AppContext.jsx:25-27")).toBeInTheDocument();
   });
 });

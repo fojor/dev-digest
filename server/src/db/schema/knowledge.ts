@@ -49,6 +49,8 @@ export const conventions = pgTable(
     evidenceSnippet: text('evidence_snippet'),
     evidenceStartLine: integer('evidence_start_line'),
     evidenceEndLine: integer('evidence_end_line'),
+    /** Clone HEAD the evidence was verified at — pins the GitHub link to those lines (null = unknown / legacy). */
+    evidenceCommitSha: text('evidence_commit_sha'),
     confidence: doublePrecision('confidence'),
     createdAt: now(),
   },

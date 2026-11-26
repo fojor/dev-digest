@@ -19,6 +19,8 @@ export interface ConventionCandidateEntity {
   evidenceSnippet: string;
   evidenceStartLine: number;
   evidenceEndLine: number;
+  /** Clone HEAD the evidence was verified at; null when unknown (legacy row, git unavailable). */
+  evidenceCommitSha: string | null;
   confidence: number;
 }
 

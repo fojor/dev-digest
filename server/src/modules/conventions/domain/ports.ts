@@ -30,6 +30,8 @@ export interface ConventionsRepository {
     workspaceId: string;
     repoId: string;
     candidates: VerifiedCandidate[];
+    /** Clone HEAD the files were read at — stored on every inserted candidate. */
+    commitSha: string | null;
     scan: ScanFacts;
   }): Promise<void>;
   /** Change status and/or rule text; original_rule, evidence, category, confidence are kept. */
@@ -46,6 +48,8 @@ export interface SampleSource {
   isIndexed(repoId: string): Promise<boolean>;
   /** Up to `limit` ranked sample files and the allow-listed root style configs, read through the contained clone reader. */
   read(repoId: string, limit: number): Promise<AnalysedFile[]>;
+  /** The clone's HEAD commit (the evidence's permalink target); null when it can't be resolved. */
+  headSha(repoId: string): Promise<string | null>;
 }
 
 /**

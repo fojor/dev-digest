@@ -6,7 +6,7 @@ import { startPg, dockerAvailable, type PgFixture } from './helpers/pg.js';
 import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/platform/config.js';
 import { seed } from '../src/db/seed.js';
-import { MockLLMProvider } from '../src/adapters/mocks.js';
+import { MockGitClient, MockLLMProvider } from '../src/adapters/mocks.js';
 import * as t from '../src/db/schema.js';
 import type { RepoIntel } from '../src/modules/repo-intel/types.js';
 import type { LLMProvider } from '@devdigest/shared';
@@ -64,6 +64,7 @@ d('conventions routes (Testcontainers pg)', () => {
             new MockLLMProvider('openai', { structuredBySchema: { ConventionExtraction: { candidates: [CANDIDATE] } } }),
         },
         repoIntel: repoIntel(o.indexed ?? true),
+        git: new MockGitClient({ head: 'f00dcafe' }),
       },
     });
   }
@@ -114,6 +115,7 @@ d('conventions routes (Testcontainers pg)', () => {
       status: 'pending',
       evidence_start_line: 1,
       evidence_end_line: 1,
+      evidence_commit_sha: 'f00dcafe',
     });
     expect(llm.calls.filter((c) => c.method === 'completeStructured')).toHaveLength(1);
     const list = ConventionList.parse((await app.inject({ method: 'GET', url: `/repos/${repoId}/conventions` })).json());

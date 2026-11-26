@@ -19,6 +19,7 @@ const CANDIDATE = {
   evidence_snippet: 'toast.error(error.message)',
   evidence_start_line: 25,
   evidence_end_line: 25,
+  evidence_commit_sha: 'f00dcafe',
   confidence: 0.6,
   status: 'accepted',
 };

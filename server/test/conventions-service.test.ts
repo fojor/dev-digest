@@ -42,11 +42,19 @@ function fakeRepo() {
       rows
         .filter((r) => r.workspaceId === ws && r.repoId === id && r.status !== 'pending')
         .map((r) => ({ rule: r.rule, originalRule: r.originalRule })),
-    replacePending: async ({ workspaceId, repoId, candidates, scan: s }) => {
+    replacePending: async ({ workspaceId, repoId, candidates, commitSha, scan: s }) => {
       if (failNextStore) throw new Error('db down');
       rows = rows.filter((r) => r.status !== 'pending');
       for (const c of candidates) {
-        rows.push({ ...c, id: `c${++seq}`, workspaceId, repoId, originalRule: c.rule, status: 'pending' });
+        rows.push({
+          ...c,
+          id: `c${++seq}`,
+          workspaceId,
+          repoId,
+          originalRule: c.rule,
+          status: 'pending',
+          evidenceCommitSha: commitSha,
+        });
       }
       scan = s;
     },
@@ -72,6 +80,7 @@ function fakeRepo() {
         evidenceSnippet: "import { client } from './client';",
         evidenceStartLine: 1,
         evidenceEndLine: 1,
+        evidenceCommitSha: null,
         confidence: 0.5,
       };
       rows.push(r);
@@ -104,6 +113,7 @@ describe('ConventionsService (T8)', () => {
   let logs: RunLogLine[];
   let indexed: boolean;
   let ranked: string[];
+  let headSha: () => Promise<string | null>;
 
   beforeEach(() => {
     clone = mkdtempSync(join(tmpdir(), 'conv-'));
@@ -116,6 +126,7 @@ describe('ConventionsService (T8)', () => {
     logs = [];
     indexed = true;
     ranked = ['src/api.ts', 'src/b.ts'];
+    headSha = async () => 'f00dcafe';
   });
   afterEach(() => rmSync(clone, { recursive: true, force: true }));
 
@@ -126,6 +137,7 @@ describe('ConventionsService (T8)', () => {
         indexState: async () => (indexed ? { status: 'full' } : { status: 'degraded', degraded: true }),
         rankedPaths: async (_id, n) => ranked.slice(0, n),
         clonePath: async () => clone,
+        headSha: () => headSha(),
       }),
       model: new LlmExtractionModel({
         resolveModel: async () => ({ provider: 'openai', model: 'conv-model' }),
@@ -169,6 +181,20 @@ describe('ConventionsService (T8)', () => {
     });
     expect(typeof logs[0]!.durationMs).toBe('number');
     expect(JSON.stringify(logs)).not.toContain("import { client }");
+  });
+
+  it('stored candidates carry the clone HEAD the evidence was verified at (GitHub permalink)', async () => {
+    const r = await service(mock([good('Use the shared client')])).extract(WS, REPO);
+    expect(r.candidates.map((c) => c.evidenceCommitSha)).toEqual(['f00dcafe']);
+  });
+
+  it('an unresolvable HEAD never fails the run — candidates are stored without a commit', async () => {
+    headSha = async () => {
+      throw new Error('not a git repository');
+    };
+    const r = await service(mock([good('Use the shared client')])).extract(WS, REPO);
+    expect(r.newCount).toBe(1);
+    expect(r.candidates[0]!.evidenceCommitSha).toBeNull();
   });
 
   it('not indexed / no sample files: refused before any model call, nothing stored (AC-02)', async () => {

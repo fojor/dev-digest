@@ -254,6 +254,12 @@ export const ConventionCandidate = z.object({
   /** 1-based line range of the fragment's first occurrence in the file. */
   evidence_start_line: z.number().int().min(1),
   evidence_end_line: z.number().int().min(1),
+  /**
+   * Clone HEAD the evidence was verified at — the client pins the GitHub link
+   * to it so the line range stays exact. null = unknown (legacy row, git
+   * unavailable); the link then falls back to the default branch.
+   */
+  evidence_commit_sha: z.string().nullable(),
   confidence: z.number().min(0).max(1),
   status: ConventionStatus,
 });

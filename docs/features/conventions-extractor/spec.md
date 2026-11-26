@@ -1,7 +1,7 @@
 # Conventions extractor — spec & implementation record
 
-Status: implemented (T1–T13, T15; e2e flow dropped by owner decision; §8 KPIs and the manual
-load check still open) · Size: M (new server module + two migrations, both vendor contract copies,
+Status: implemented (T1–T13, T15, T16 evidence link to GitHub; e2e flow dropped by owner decision;
+§8 KPIs and the manual load check still open) · Size: M (new server module + three migrations, both vendor contract copies,
 skills API extension, a new page with a modal) · Packages: server, client (reviewer-core unchanged —
 the conventions skill reaches the prompt as an ordinary skill)
 
@@ -19,15 +19,17 @@ Most of the data layer already existed with no feature behind it: the `conventio
 
 ## 2. Goal
 
-Draft-and-curate: one extraction run reads a small deterministic sample of the repo, asks the
-conventions model **once** for candidate rules, and stores only candidates whose evidence is
-verified against the real code. The Developer accepts, rejects or rewrites each candidate and
+Draft-and-curate: one extraction run reads a small deterministic sample of the repo (chosen by
+code through repo-intel `getConventionSamples()`), asks the conventions model **once** for
+candidate rules, and stores only candidates whose evidence is verified against the real code.
+Every convention the Developer sees carries its evidence — a file and a quoted fragment — and one
+click on it opens those exact lines on GitHub. The Developer accepts, rejects or rewrites each candidate and
 assembles the accepted ones into one editable `convention` skill.
 
 | # | Surface | Where | What |
 |---|---------|-------|------|
 | S1 | Conventions page | `/repos/:repoId/conventions` (sidebar entry) | header (repo, sample count, «X ago», `N of M accepted`), **Run extraction** / **Re-scan**, empty states, candidate list |
-| S2 | Candidate card | S1 (`CandidateCard`, `EvidenceSnippet`) | rule, category, status badge, `file:lines`, quoted fragment, confidence % + bar, Accept / Reject, inline rule edit |
+| S2 | Candidate card | S1 (`CandidateCard`, `EvidenceSnippet`) | rule, category, status badge, `file:lines` as a link to the lines on GitHub (new tab), quoted fragment, confidence % + bar, Accept / Reject, inline rule edit |
 | S3 | Re-scan confirmation | S1 (`RescanConfirm`) | «N pending (M edited) will be replaced» — shown only when pending candidates exist |
 | S4 | Create skill modal | S1 (`CreateSkillModal`) | pre-filled name / description / enabled / body, create-vs-update warning, trust warning, validation |
 
@@ -41,6 +43,10 @@ category list; automatic linking to agents.
 | Topic | Decision |
 |-------|----------|
 | Review state | `status ∈ pending | accepted | rejected` replaces the `accepted` boolean (migrations `0014`/`0015`); no new table. Rejected candidates stay visible; a decision can be changed either way. |
+| Who picks the files | Code, never the model: `getConventionSamples()` (repo-intel rank, tests/configs/migrations excluded, ties by path) plus the style-config allow-list. The model gets the files in its single call and cannot ask for more — it has no tools. Code selection is deterministic, cheap (no extra round-trips) and bounded, and it fixes the set of files evidence can be verified against. |
+| Calls per run | Exactly one structured model call per extraction run, regardless of repo size or how many candidates come back. |
+| Evidence required | Every stored and listed convention has evidence: file path + quoted fragment + line range. A candidate without verifiable evidence is dropped by code (no second model call, no retry). Legacy rows with no evidence are never listed. |
+| Evidence link | The `file:lines` header links to `https://github.com/<owner/repo>/blob/<sha>/<path>#L<start>-L<end>`. `<sha>` is the clone HEAD the fragment was verified at (stored per candidate, `evidence_commit_sha`), so the lines stay exact after the branch moves on; unknown sha → the repo's default branch. Built in the client by `githubBlobUrl` (same helper as PR findings). |
 | Who checks candidates | The model only proposes. Code verifies each candidate against the analysed files before storage; nothing becomes an instruction until the Developer accepts it **and** saves a skill. |
 | Extraction run | Synchronous request; the Developer waits on the page. One run per repo at a time via a process-local set of in-flight repo ids (a restart clears it). Model call aborted at 120 s. |
 | Re-scan | Replaces only pending candidates (including edited pending ones); accepted and rejected stay with their edits and are sent to the model as a do-not-repeat list. Confirm first if pending candidates exist. |
@@ -57,7 +63,11 @@ category list; automatic linking to agents.
 ### 4.1 Candidate
 - Fields: `rule` (1–1000, trimmed), `original_rule`, `category` (1–40, free label from the model,
   not editable or normalised), `evidence_path`, `evidence_snippet` (the quoted fragment), `evidence_start_line` /
-  `evidence_end_line`, `confidence` (0–1, shown as %), `status`, `created_at`.
+  `evidence_end_line`, `evidence_commit_sha` (clone HEAD at verification; null = unknown),
+  `confidence` (0–1, shown as %), `status`, `created_at`.
+- Evidence is mandatory: `evidence_path` and `evidence_snippet` are non-empty on every listed
+  candidate. Legacy rows without them stay in the table (they still feed the do-not-repeat list)
+  but `GET` never returns them.
 - Repo-level scan facts: `repos.conventions_scanned_at`, `repos.conventions_sample_count` — written
   only by a successful run, so a run that stored nothing still leaves a trace.
 - Workspace-scoped; another workspace's repo or candidate → not found, revealing nothing.
@@ -65,7 +75,8 @@ category list; automatic linking to agents.
 ### 4.2 Extraction run (`POST /repos/:repoId/conventions/extract`)
 1. Refuse if the repo is already scanning (`409 conventions_scan_in_progress`) or has no sample
    files (`409 conventions_repo_not_indexed`, reason `not_indexed | no_sample_files`).
-2. Input: ≤ 12 sample files by index importance (ties ordered by path — deterministic), each cut to
+2. Input, selected by code (the model never chooses files): ≤ 12 sample files from repo-intel
+   `getConventionSamples()` by index importance (ties ordered by path — deterministic), each cut to
    400 lines; root style configs from the allow-list (`.eslintrc*`, `eslint.config.*`,
    `tsconfig*.json`, `.prettierrc*`, `prettier.config.*`, `.editorconfig`, `biome.json`); the
    do-not-repeat list (current + original text of accepted and rejected candidates). Total
@@ -75,7 +86,7 @@ category list; automatic linking to agents.
    Failure (unavailable, no credentials, > 120 s, answer not readable as a list) →
    `502 conventions_extraction_failed` with a plain-language reason; nothing stored, previous
    candidates and scan facts kept, repo no longer scanning.
-4. Per candidate, in order:
+4. Per candidate, in order — all in code, no further model call:
    - **normalise** — rule cut to 1000, category to 40, confidence clamped; a candidate missing a
      required field is dropped and counted;
    - **verify evidence** — the path is one of this run's analysed files, the file exists, the
@@ -85,8 +96,9 @@ category list; automatic linking to agents.
    - **repeat suppression** — equal (lower-case, collapsed whitespace) to the current or original
      text of an accepted/rejected candidate → dropped;
    - **limit** — ≤ 20 stored, lowest confidence dropped first.
-5. In one transaction: delete pending candidates, insert the survivors as pending, write the scan
-   facts. Response: scan facts, the full list and the new-candidate count.
+5. In one transaction: delete pending candidates, insert the survivors as pending with the clone
+   HEAD sha read just before the files (`evidence_commit_sha`; a failing lookup stores null and
+   never fails the run), write the scan facts. Response: scan facts, the full list and the new-candidate count.
 6. One log line per run: repo id, model, proposed / discarded (by reason) / stored counts,
    duration. Fragments are never logged.
 
@@ -104,6 +116,8 @@ category list; automatic linking to agents.
 - Scanning: controls disabled, «Scanning…».
 - Errors (not indexed, scan already running, extraction failed): banner with the reason above
   the unchanged list.
+- Evidence: `file:lines` header is a link (new tab, `noopener`) to the lines on GitHub per §3
+  «Evidence link»; while the repo list is still loading it is plain text. Copy fragment stays.
 - Accepted card: accent border + «Accepted» badge. Rejected card: dimmed + «Rejected» badge, stays
   in the list.
 
@@ -145,7 +159,7 @@ does not.
 
 Contract changes (both `vendor/shared` copies, `contracts/knowledge.ts`): `ConventionCandidate`
 `accepted` → `status`, plus `category`, `original_rule`, `evidence_start_line`,
-`evidence_end_line`; `ConventionScan`, `ConventionList`, `ExtractionResult`, `ConventionPatch`; `Skill.updated_at`; skill create accepts
+`evidence_end_line`, `evidence_commit_sha` (nullable); `ConventionScan`, `ConventionList`, `ExtractionResult`, `ConventionPatch`; `Skill.updated_at`; skill create accepts
 `extracted` and `evidence_files`. Error codes are mapped in `server/src/platform/errors.ts`.
 
 ## 6. Acceptance criteria
@@ -201,6 +215,15 @@ components in `client/src/app/repos/[repoId]/conventions/`).
 - **AC21** Legacy rows migrate: `accepted = true` → `accepted`, the rest → `pending`,
   `original_rule = rule`. — `conventions-migration.it.test.ts`
 - **AC22** All new UI strings come from `messages/en/conventions.json`.
+- **AC23** The evidence header opens the file at the evidence lines on GitHub in a new tab, pinned
+  to the commit the fragment was verified at; without a commit it uses the default branch; an
+  unresolvable HEAD never fails a run. — `CandidateCard.test.tsx`, `conventions-service.test.ts`,
+  `conventions-routes.it.test.ts`, `conventions-repository.it.test.ts`
+- **AC24** Only candidates with evidence are listed; evidence-less legacy rows are hidden but still
+  suppress repeats. — `conventions-repository.it.test.ts`
+- **AC25** Sample files are chosen by code (`getConventionSamples()` + allow-list), never by the
+  model; one run = one model call; unverified candidates are dropped without another call. —
+  `conventions-service.test.ts` (AC1, AC2 cases), `conventions-extraction-model.test.ts`
 
 ## 7. Implementation record
 
@@ -238,6 +261,14 @@ components in `client/src/app/repos/[repoId]/conventions/`).
   `RescanConfirm`, `CreateSkillModal`; `lib/hooks/conventions.ts`; sidebar entry;
   `messages/en/conventions.json`.
 
+### Step 7a — evidence link to GitHub (T16)
+- `0016_conventions_evidence_commit.sql`: nullable `conventions.evidence_commit_sha`.
+- `SampleSource.headSha()` (wired to `container.git.currentHead`), stored by `replacePending`;
+  presenter + contract `evidence_commit_sha`.
+- `listByRepo` filters out rows without evidence path/fragment.
+- Client: `evidenceUrl` (`EvidenceSnippet/helpers.ts`, over `lib/github-urls.ts`), `EvidenceSnippet`
+  `href`, `CandidateCard` `repo` prop from `ConventionsView`; message `card.openOnGitHub`.
+
 ### Step 7 — verification (T15)
 - `conventions-skill-review.it.test.ts` proves the skill reaches the review prompt; typecheck,
   ESLint, architecture gate and contract check green.
@@ -258,6 +289,9 @@ components in `client/src/app/repos/[repoId]/conventions/`).
 - **Cross-repo bleed** (accepted): a conventions skill linked to an agent that reviews several repos
   enforces repo A's rules on repo B; the shared default name means a save from repo B can update
   repo A's skill (warned, kept in history).
+- **Evidence link target**: the clone HEAD normally equals `origin/<default branch>` after a sync,
+  so the commit exists on GitHub; a clone with local-only commits would yield a 404 link. Rows
+  stored before T16 have no sha and link to the default branch, where lines may have moved.
 - **Secrets in sample source files** still reach the model provider, exactly as in a regular review.
 - **KPIs not measured yet** (local DB + run log): useful-run rate (≥ 3 stored) ≥ 70 % on seeded
   repos; verification drop rate ≤ 40 %; curation acceptance ≥ 30 %; ≥ 60 % of conventions skills

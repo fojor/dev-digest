@@ -35,7 +35,8 @@ export function ConventionsView() {
   const [creating, setCreating] = React.useState(false);
   const [runError, setRunError] = React.useState<unknown>(null);
 
-  const repoName = repos.find((r) => r.id === repoId)?.full_name ?? t("page.repoFallback");
+  const repo = repos.find((r) => r.id === repoId) ?? null;
+  const repoName = repo?.full_name ?? t("page.repoFallback");
   const crumb = [{ label: repoName, mono: true }, { label: tShell("nav.conventions") }];
 
   const startRun = () => {
@@ -107,7 +108,7 @@ export function ConventionsView() {
         {errorBanner}
         <div style={s.list}>
           {candidates.map((c) => (
-            <CandidateCard key={c.id} repoId={repoId} candidate={c} readOnly={scanning} />
+            <CandidateCard key={c.id} repoId={repoId} candidate={c} readOnly={scanning} repo={repo} />
           ))}
         </div>
       </>

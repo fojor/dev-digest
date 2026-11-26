@@ -116,6 +116,7 @@ export class ConventionsService {
   /** Sampling → one model call → screening → one-transaction store. Returns the stored count. */
   private async run(workspaceId: string, repoId: string, line: RunLogLine): Promise<number> {
     if (!(await this.d.samples.isIndexed(repoId))) throw new RepoNotIndexed('not_indexed');
+    const commitSha = await this.d.samples.headSha(repoId);
     const files = await this.d.samples.read(repoId, SAMPLE_LIMIT);
     if (!files.some((f) => f.kind === 'sample')) throw new RepoNotIndexed('no_sample_files');
 
@@ -150,6 +151,7 @@ export class ConventionsService {
       workspaceId,
       repoId,
       candidates: top.kept,
+      commitSha,
       scan: {
         scannedAt: this.now(),
         sampleCount: answer.files.filter((f) => f.kind === 'sample').length,

@@ -17,6 +17,7 @@ export function presentCandidate(c: ConventionCandidateEntity): ConventionCandid
     evidence_snippet: c.evidenceSnippet,
     evidence_start_line: c.evidenceStartLine,
     evidence_end_line: c.evidenceEndLine,
+    evidence_commit_sha: c.evidenceCommitSha,
     confidence: c.confidence,
     status: c.status,
   };

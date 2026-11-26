@@ -63,7 +63,8 @@
     "counter": "{n} / {max}",
     "ruleLimit": "The rule must be between 1 and {max} characters.",
     "copyFragment": "Copy fragment",
-    "copied": "Fragment copied"
+    "copied": "Fragment copied",
+    "openOnGitHub": "Open these lines on GitHub"
   },
   "modal": {
     "title": "Create skill from conventions",

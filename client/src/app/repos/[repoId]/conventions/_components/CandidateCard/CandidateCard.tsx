@@ -10,6 +10,7 @@ import { Badge, Button, Chip, ProgressBar, Textarea } from "@devdigest/ui";
 import { usePatchConvention } from "@/lib/hooks/conventions";
 import { useToast } from "@/lib/toast";
 import { EvidenceSnippet } from "../EvidenceSnippet";
+import { evidenceUrl } from "../EvidenceSnippet/helpers";
 import { errorKey } from "../ConventionsView/helpers";
 import { confidencePct, validRule } from "./helpers";
 import { s } from "./styles";
@@ -18,10 +19,13 @@ export function CandidateCard({
   repoId,
   candidate: c,
   readOnly,
+  repo,
 }: {
   repoId: string;
   candidate: ConventionCandidate;
   readOnly?: boolean;
+  /** The repo on GitHub — makes the evidence header a link; absent while repos load. */
+  repo?: { full_name: string; default_branch: string } | null;
 }) {
   const t = useTranslations("conventions");
   const patch = usePatchConvention(repoId);
@@ -116,6 +120,12 @@ export function CandidateCard({
         startLine={c.evidence_start_line}
         endLine={c.evidence_end_line}
         fragment={c.evidence_snippet}
+        href={evidenceUrl(repo, {
+          path: c.evidence_path,
+          startLine: c.evidence_start_line,
+          endLine: c.evidence_end_line,
+          commitSha: c.evidence_commit_sha,
+        })}
       />
       <div style={s.confidence}>
         <div style={{ flex: 1 }}>

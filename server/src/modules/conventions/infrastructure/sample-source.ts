@@ -11,6 +11,8 @@ export interface SampleSourceDeps {
   /** Ranked repo-relative paths, highest first, equal ranks by path. */
   rankedPaths(repoId: string, n: number): Promise<string[]>;
   clonePath(repoId: string): Promise<string | null>;
+  /** The clone's HEAD sha; absent or failing → null (links fall back to the default branch). */
+  headSha?(repoId: string): Promise<string | null>;
 }
 
 /**
@@ -26,6 +28,14 @@ export class CloneSampleSource implements SampleSource {
   async isIndexed(repoId: string): Promise<boolean> {
     const s = await this.deps.indexState(repoId);
     return !s.degraded && (s.status === 'full' || s.status === 'partial');
+  }
+
+  async headSha(repoId: string): Promise<string | null> {
+    try {
+      return (await this.deps.headSha?.(repoId)) ?? null;
+    } catch {
+      return null; // a missing link must never fail the run
+    }
   }
 
   async read(repoId: string, limit: number): Promise<AnalysedFile[]> {

@@ -89,6 +89,7 @@ d('DrizzleConventionsRepository (Testcontainers pg)', () => {
     await repo.replacePending({
       ...ids,
       candidates: [verified('New one', { confidence: 0.9 }), verified('New two')],
+      commitSha: 'f00dcafe',
       scan: { scannedAt, sampleCount: 7 },
     });
 
@@ -104,6 +105,7 @@ d('DrizzleConventionsRepository (Testcontainers pg)', () => {
     const accepted = list.find((c) => c.id === acc)!;
     expect(accepted.originalRule).toBe('Accepted original');
     expect(list.find((c) => c.id === rej)).toBeDefined();
+    expect(accepted.evidenceCommitSha).toBeNull(); // decided rows keep their own (here: legacy) commit
     const fresh = list.find((c) => c.rule === 'New one')!;
     expect(fresh).toMatchObject({
       originalRule: 'New one',
@@ -111,6 +113,7 @@ d('DrizzleConventionsRepository (Testcontainers pg)', () => {
       evidencePath: 'src/api.ts',
       evidenceStartLine: 3,
       evidenceEndLine: 3,
+      evidenceCommitSha: 'f00dcafe',
       confidence: 0.9,
       workspaceId: ids.workspaceId,
       repoId: ids.repoId,
@@ -121,6 +124,19 @@ d('DrizzleConventionsRepository (Testcontainers pg)', () => {
     });
   });
 
+  it('listByRepo hides legacy rows without evidence (every listed convention is backed by code); they still feed do-not-repeat', async () => {
+    const ids = await seedRepo();
+    await insertRow(ids, 'With evidence', 'accepted');
+    await pg.handle.db.insert(t.conventions).values([
+      { ...ids, rule: 'No evidence at all', status: 'accepted' },
+      { ...ids, rule: 'Empty fragment', status: 'rejected', evidencePath: 'a.ts', evidenceSnippet: '' },
+    ]);
+    const list = await repo.listByRepo(ids.workspaceId, ids.repoId);
+    expect(list.map((c) => c.rule)).toEqual(['With evidence']);
+    const decided = await repo.decidedRules(ids.workspaceId, ids.repoId);
+    expect(decided.map((r) => r.rule).sort()).toEqual(['Empty fragment', 'No evidence at all', 'With evidence']);
+  });
+
   it('replacePending is atomic: a failing insert leaves the previous state', async () => {
     const ids = await seedRepo();
     await insertRow(ids, 'Kept pending', 'pending');
@@ -129,6 +145,7 @@ d('DrizzleConventionsRepository (Testcontainers pg)', () => {
         ...ids,
         // A NaN line number cannot be stored as integer → the insert fails mid-transaction.
         candidates: [verified('ok'), verified('broken', { evidenceStartLine: Number.NaN })],
+        commitSha: null,
         scan: { scannedAt: new Date(), sampleCount: 3 },
       }),
     ).rejects.toThrow();

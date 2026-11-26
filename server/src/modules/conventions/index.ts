@@ -21,6 +21,10 @@ export default async function conventionsModule(app: FastifyInstance): Promise<v
       indexState: (repoId) => c.repoIntel.getIndexState(repoId),
       rankedPaths: (repoId, n) => c.repoIntel.getConventionSamples(repoId, n),
       clonePath: (repoId) => repo.clonePath(repoId),
+      headSha: async (repoId) => {
+        const ref = await repo.repoRef(repoId);
+        return ref ? c.git.currentHead(ref) : null;
+      },
     }),
     model: new LlmExtractionModel({
       resolveModel: (workspaceId) => c.featureModel(workspaceId, 'conventions'),

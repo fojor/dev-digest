@@ -31,6 +31,7 @@ const cand = (id: string, o: Partial<ConventionCandidate> = {}): ConventionCandi
   evidence_snippet: "x",
   evidence_start_line: 1,
   evidence_end_line: 1,
+  evidence_commit_sha: null,
   confidence: 0.5,
   status: "accepted",
   ...o,
