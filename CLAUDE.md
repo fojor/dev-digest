@@ -8,10 +8,11 @@ Node ≥22 · pnpm ≥10 · TypeScript 5.x · Zod 3.25 (not v4) · vitest 2 · P
 - server/        — Fastify 5 API :3001 + DB + jobs  → server/CLAUDE.md
 - reviewer-core/ — pure review engine (no DB/FS)    → reviewer-core/CLAUDE.md
 - e2e/           — deterministic browser flows      → e2e/CLAUDE.md
-- docs/          — cross-cutting docs (onboarding, agent prompts)
+- docs/          — cross-cutting docs (onboarding, agent prompts); docs/plans/<branch>.md — Development Plans from the planner agent
 - scripts/       — dev.sh (whole stack), e2e.sh (hermetic e2e)
 - INSIGHTS.md    — cross-package lessons; each package has its own INSIGHTS.md (skill engineering-insights)
 - .claude/       — skills (vendored + our own: engineering-insights, onion-architecture, frontend-ui-architecture, pr-self-review, demo-video), settings.json with the insights hooks and the PR gate hook
+- .claude/agents/ — subagents: researcher (read-only facts), planner (read-only plan → docs/plans/<branch>.md), implementer (executes a READY plan), test-writer (test files only: reproduce / gap-fill), plan-verifier and architecture-reviewer (read-only reviews of the result, may run checks), doc-writer (Markdown docs only); hooks in .claude/agents/hooks/ — map and permissions in .claude/agents/README.md
 
 Working in a subproject → read its CLAUDE.md first (auto-loading is unreliable in the VS Code extension).
 
