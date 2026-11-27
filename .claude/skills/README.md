@@ -18,6 +18,7 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [typescript-expert](typescript-expert/SKILL.md) | Full-stack | Type-level programming, performance, tooling, migrations |
 | [security](security/SKILL.md) | Full-stack | OWASP Top 10:2025, auth, injection, uploads, secrets |
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
+| [demo-video](demo-video/SKILL.md) | Shared | Our own: scenario `docs/demos/<branch>.md` (drafted from a prompt or the branch via its template, or hand-written) → agent-browser run in its own Chrome → paced .mp4 with captions in `demo/<branch>/` (git-ignored), status written back into the scenario; human guide in its README.md |
 | [engineering-insights](engineering-insights/SKILL.md) | Shared | Learnings loop: reads and append-only writes per-module INSIGHTS.md; read/wrapup/guard hooks in ../settings.json |
 | [pr-self-review](pr-self-review/SKILL.md) | Shared | Our own: reviews all local changes before a PR — lint/typecheck/tests for touched packages, then the skills above on the files they cover (map: `skill-map.json`), Opus-verified CRITICALs → PASS/BLOCK verdict; `pr-gate` PreToolUse hook in ../settings.json refuses `gh pr create` / `git push` (open PR) without a PASS; `scripts/ci.mjs` runs the same repo rules in CI |
 

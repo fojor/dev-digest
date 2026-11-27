@@ -11,7 +11,7 @@ Node ≥22 · pnpm ≥10 · TypeScript 5.x · Zod 3.25 (not v4) · vitest 2 · P
 - docs/          — cross-cutting docs (onboarding, agent prompts)
 - scripts/       — dev.sh (whole stack), e2e.sh (hermetic e2e)
 - INSIGHTS.md    — cross-package lessons; each package has its own INSIGHTS.md (skill engineering-insights)
-- .claude/       — skills (vendored + our own: engineering-insights, onion-architecture, frontend-ui-architecture, pr-self-review), settings.json with the insights hooks and the PR gate hook
+- .claude/       — skills (vendored + our own: engineering-insights, onion-architecture, frontend-ui-architecture, pr-self-review, demo-video), settings.json with the insights hooks and the PR gate hook
 
 Working in a subproject → read its CLAUDE.md first (auto-loading is unreliable in the VS Code extension).
 
@@ -28,7 +28,7 @@ Working in a subproject → read its CLAUDE.md first (auto-loading is unreliable
   `scripts/check-contracts.sh` enforces it in CI (client workflow).
   Changing a contract → update both copies. reviewer-core reads the copy in server/.
 - A change in reviewer-core/** triggers CI server-unit — also check the server typecheck
-- .claude/skills/* — vendored skills for the assistant, not product code; the exceptions are our own engineering-insights (its hooks are in .claude/settings.json), onion-architecture (backend layering rules for server/ + reviewer-core), frontend-ui-architecture (code organization rules for client/) and pr-self-review (pre-PR review + PR gate hook; a new skill must be added to its skill-map.json)
+- .claude/skills/* — vendored skills for the assistant, not product code; the exceptions are our own engineering-insights (its hooks are in .claude/settings.json), onion-architecture (backend layering rules for server/ + reviewer-core), frontend-ui-architecture (code organization rules for client/), pr-self-review (pre-PR review + PR gate hook; a new skill must be added to its skill-map.json) and demo-video (scenario → recorded .mp4 in git-ignored demo/)
 
 ## Do not touch
 - `docker compose down -v` — destroys the devdigest_pgdata volume with all imported repos

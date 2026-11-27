@@ -13,7 +13,8 @@
   "excluded": {
     "mermaid-diagram": "authoring aid for diagrams, not a code-review rule set",
     "engineering-insights": "knowledge loop for INSIGHTS.md, not a code-review rule set",
-    "pr-self-review": "this skill — it runs the others"
+    "pr-self-review": "this skill — it runs the others",
+    "demo-video": "records demo videos of the web app, not a code-review rule set"
   },
   "skills": {
     "frontend-ui-architecture": {
