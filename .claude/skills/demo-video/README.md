@@ -4,6 +4,28 @@ Turns a written scenario into demo videos of the DevDigest web app. Claude drive
 headless Chrome through the app, pauses so a viewer can follow, shows captions and highlights
 every click, and saves one `.mp4` per video.
 
+## Prerequisites
+
+Once per machine:
+
+| What | Install | Check |
+|------|---------|-------|
+| [agent-browser](https://github.com/vercel-labs/agent-browser) — drives its own Chrome | `npm i -g agent-browser && agent-browser install` (the second command downloads the browser) | `agent-browser doctor` |
+| ffmpeg with `libx264` and `libvpx` — encodes, joins and samples the video | macOS: `brew install ffmpeg`; Linux: `apt install ffmpeg` | `ffmpeg -hide_banner -encoders \| grep -E 'libx264\|libvpx'` |
+| Node ≥ 22 — runs the skill's scripts (same as the repo) | — | `node --version` |
+
+Before each recording:
+
+- **The app is running** — web on `:3000`, API on `:3001` (`./scripts/dev.sh`). Claude checks
+  this and can start it.
+- **A model provider key in Settings** — only for videos that call an LLM (Run Review, Run
+  extraction).
+- **The data in the scenario's Preconditions** (e.g. a seeded PR, an agent with no skills). A
+  recording changes the local DB, so recording a video again may need that data put back
+  first; Claude checks and asks before deleting anything.
+- **Internet access** if the scenario opens GitHub. The recording browser is not signed in, so
+  only public pages work.
+
 ## In short
 
 1. **Get a scenario** at `docs/demos/<branch>.md` — the name of the branch with your changes,
