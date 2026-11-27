@@ -14,10 +14,10 @@ import { z } from 'zod';
 import { loadConfig, type AppConfig } from './platform/config.js';
 import { createDb, type Db } from './db/client.js';
 import { Container, type ContainerOverrides } from './platform/container.js';
-import { AppError } from './platform/errors.js';
+import { AppError, DOMAIN_STATUS } from './platform/errors.js';
+import { DomainError } from './modules/_shared/domain/errors.js';
 import { isAllowedHost, isAllowedOrigin } from './platform/local-only.js';
 import { modules } from './modules/index.js';
-import { ReviewService } from './modules/reviews/service.js';
 
 // Attach the DI container to every request/instance.
 declare module 'fastify' {
@@ -79,7 +79,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   // NOTE: assumes a SINGLE API instance per DB. With multiple replicas this
   // would need per-instance scoping / heartbeats (not this app's deployment).
   try {
-    const reaped = await new ReviewService(container).reapStaleRuns();
+    const reaped = await container.reviewService.reapStaleRuns();
     if (reaped > 0) app.log.info({ reaped }, 'reaped stale running agent_runs on boot');
   } catch (err) {
     app.log.warn({ err: (err as Error).message }, 'stale-run reaping failed (non-fatal)');
@@ -161,6 +161,12 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
           message: 'Request validation failed',
           details: maybeZod.issues ?? maybeZod.errors,
         },
+      });
+      return;
+    }
+    if (err instanceof DomainError) {
+      reply.status(DOMAIN_STATUS[err.code] ?? 400).send({
+        error: { code: err.code, message: err.message, details: err.details },
       });
       return;
     }

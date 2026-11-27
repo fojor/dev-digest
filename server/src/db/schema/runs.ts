@@ -1,7 +1,8 @@
-import { pgTable, uuid, text, integer, jsonb, timestamp, doublePrecision } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, jsonb, timestamp, doublePrecision, index, primaryKey } from 'drizzle-orm/pg-core';
 import { workspaces } from './core';
 import { agents } from './agents';
 import { pullRequests } from './pulls';
+import { skills } from './skills';
 
 // ============================================================ Observability
 
@@ -30,7 +31,37 @@ export const agentRuns = pgTable('agent_runs', {
   score: integer('score'),
   /** Findings that tripped the agent's gate (severity ≥ ciFailOn). */
   blockers: integer('blockers'),
-});
+}, (t) => ({
+  // Run history per PR, newest first; SET NULL scan when an agent is deleted.
+  prRanAtIdx: index('agent_runs_pr_ran_at_idx').on(t.prId, t.ranAt),
+  agentIdx: index('agent_runs_agent_idx').on(t.agentId),
+  // Per-agent runs in a time window (skill stats: pull frequency, 30 days).
+  agentRanAtIdx: index('agent_runs_agent_ran_at_idx').on(t.agentId, t.ranAt),
+}));
+
+/**
+ * Which skills a run's prompt contained (M2 Phase 2): the skill version, its
+ * position in the Skills section and the tokens of its rendered block. Drives
+ * skill pull frequency and maps a finding's `skill` tag to a skill id.
+ */
+export const runSkills = pgTable(
+  'run_skills',
+  {
+    runId: uuid('run_id')
+      .notNull()
+      .references(() => agentRuns.id, { onDelete: 'cascade' }),
+    skillId: uuid('skill_id')
+      .notNull()
+      .references(() => skills.id, { onDelete: 'cascade' }),
+    skillVersion: integer('skill_version').notNull(),
+    position: integer('position').notNull(),
+    tokens: integer('tokens').notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.runId, t.skillId] }),
+    skillIdx: index('run_skills_skill_idx').on(t.skillId),
+  }),
+);
 
 /** Whole trace of one run as a SINGLE jsonb document. */
 export const runTraces = pgTable('run_traces', {

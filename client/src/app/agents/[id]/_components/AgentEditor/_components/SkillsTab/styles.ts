@@ -1,0 +1,45 @@
+import type { CSSProperties } from "react";
+
+/** Co-located styles for SkillsTab. */
+export const s = {
+  wrap: { maxWidth: 1060 } satisfies CSSProperties,
+  header: { display: "flex", alignItems: "center", gap: 12, marginBottom: 14 } satisfies CSSProperties,
+  h2: { fontSize: 18, fontWeight: 700 } satisfies CSSProperties,
+  filter: {
+    marginLeft: "auto",
+    width: 300,
+    padding: "7px 10px",
+    borderRadius: 8,
+    border: "1px solid var(--border)",
+    background: "var(--bg-base)",
+    color: "var(--text-primary)",
+    fontSize: 13,
+  } satisfies CSSProperties,
+  hint: { fontSize: 13, color: "var(--text-muted)", marginBottom: 18 } satisfies CSSProperties,
+  list: { display: "flex", flexDirection: "column", gap: 8 } satisfies CSSProperties,
+  row: (dragging: boolean, over: boolean): CSSProperties => ({
+    display: "flex",
+    alignItems: "center",
+    gap: 14,
+    padding: "12px 16px",
+    borderRadius: 10,
+    background: "var(--bg-surface)",
+    borderTop: `1px solid ${over ? "var(--accent)" : "var(--border)"}`,
+    borderRight: "1px solid var(--border)",
+    borderBottom: "1px solid var(--border)",
+    borderLeft: "1px solid var(--border)",
+    opacity: dragging ? 0.5 : 1,
+  }),
+  handle: (enabled: boolean): CSSProperties => ({
+    display: "inline-flex",
+    color: "var(--text-muted)",
+    cursor: enabled ? "grab" : "default",
+    opacity: enabled ? 1 : 0.35,
+    background: "none",
+    border: "none",
+    padding: 2,
+  }),
+  name: { fontSize: 14 } satisfies CSSProperties,
+  right: { marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 } satisfies CSSProperties,
+  muted: { fontSize: 12, color: "var(--text-muted)" } satisfies CSSProperties,
+} as const;

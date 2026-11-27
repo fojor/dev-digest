@@ -11,10 +11,12 @@ import type { AppConfig } from './config.js';
 import type { Db } from '../db/client.js';
 import { JobRunner } from './jobs.js';
 import { runBus, type RunBus } from './sse.js';
+import { RunLogger } from './run-logger.js';
 import { LocalSecretsProvider } from '../adapters/secrets/local.js';
 import { LocalNoAuthProvider } from '../adapters/auth/local.js';
 import { OctokitGitHubClient } from '../adapters/github/octokit.js';
 import { SimpleGitClient } from '../adapters/git/simple-git.js';
+import { parseUnifiedDiff } from '../adapters/git/diff-parser.js';
 import { RipgrepCodeIndex } from '../adapters/codeindex/ripgrep.js';
 import { OpenAIProvider } from '../adapters/llm/openai.js';
 import { AnthropicProvider } from '../adapters/llm/anthropic.js';
@@ -23,12 +25,25 @@ import { OpenRouterProvider } from '@devdigest/reviewer-core';
 import { estimateCost } from '../adapters/llm/pricing.js';
 import { PriceBook } from './price-book.js';
 import { ConfigError } from './errors.js';
-import { AgentsRepository } from '../modules/agents/repository.js';
-import { ReviewRepository } from '../modules/reviews/repository.js';
+import type { AgentsRepository, AgentsUnitOfWork } from '../modules/agents/domain/ports.js';
+import { DrizzleAgentsRepository } from '../modules/agents/infrastructure/agents.repository.js';
+import { DrizzleAgentsUnitOfWork } from '../modules/agents/infrastructure/agents.uow.js';
+import type { SkillStatsReader, SkillsRepository, SkillsUnitOfWork } from '../modules/skills/domain/ports.js';
+import { DrizzleSkillsRepository } from '../modules/skills/infrastructure/skills.repository.js';
+import { DrizzleSkillsUnitOfWork } from '../modules/skills/infrastructure/skills.uow.js';
+import { DrizzleSkillStatsReader } from '../modules/skills/infrastructure/skills-stats.reader.js';
+import { type ArchiveReader, FflateArchiveReader } from '../adapters/archive/index.js';
+import { ReviewRepository } from '../modules/reviews/infrastructure/review.repository.js';
+import { ReviewService } from '../modules/reviews/application/service.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
+import { RepoIntelRepository } from '../modules/repo-intel/repository.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
+import { FEATURE_MODELS, type FeatureModelChoice, type FeatureModelId } from '@devdigest/shared';
+import { DrizzleSettingsRepository } from '../modules/settings/infrastructure/settings.repository.js';
+import { featureModelDefaults } from '../modules/settings/domain/policies.js';
+import { resolveFeatureModel } from '../modules/settings/application/feature-models.js';
 
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
@@ -71,8 +86,14 @@ export class Container {
   // runs). Constructed here, in the composition root, so consuming modules use
   // `container.agentsRepo` instead of reaching into another module's folder.
   private _agentsRepo?: AgentsRepository;
+  private _agentsUow?: AgentsUnitOfWork;
+  private _skillsRepo?: SkillsRepository;
+  private _skillsUow?: SkillsUnitOfWork;
+  private _archive?: ArchiveReader;
+  private _skillStats?: SkillStatsReader;
   private _reviewRepo?: ReviewRepository;
-  private _repoIntel?: RepoIntel;
+  private _reviewService?: ReviewService;
+  private _repoIntelService?: RepoIntelService;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
   private _priceBook?: PriceBook;
@@ -94,12 +115,59 @@ export class Container {
     return this._git;
   }
 
+  /** Agents persistence port (also read by reviews to pick review targets). */
   get agentsRepo(): AgentsRepository {
-    return (this._agentsRepo ??= new AgentsRepository(this.db));
+    return (this._agentsRepo ??= new DrizzleAgentsRepository(this.db));
+  }
+
+  /** Transaction boundary for multi-write agents use cases. */
+  get agentsUow(): AgentsUnitOfWork {
+    return (this._agentsUow ??= new DrizzleAgentsUnitOfWork(this.db));
+  }
+
+  /** Skills persistence port (also read by reviews to build the prompt). */
+  get skillsRepo(): SkillsRepository {
+    return (this._skillsRepo ??= new DrizzleSkillsRepository(this.db));
+  }
+
+  get skillsUow(): SkillsUnitOfWork {
+    return (this._skillsUow ??= new DrizzleSkillsUnitOfWork(this.db));
+  }
+
+  /** Read-only skill usage numbers (Skills page cards, Stats tab). */
+  get skillStats(): SkillStatsReader {
+    return (this._skillStats ??= new DrizzleSkillStatsReader(this.db));
+  }
+
+  /** In-memory zip reader for skill import (never extracts or executes). */
+  get archive(): ArchiveReader {
+    return (this._archive ??= new FflateArchiveReader());
   }
 
   get reviewRepo(): ReviewRepository {
     return (this._reviewRepo ??= new ReviewRepository(this.db));
+  }
+
+  /** Review runs + findings; adapters resolved lazily per call, as before. */
+  get reviewService(): ReviewService {
+    const c = this; // the getters below read the live container
+    this._reviewService ??= new ReviewService({
+      repo: this.reviewRepo,
+      agents: this.agentsRepo,
+      runBus: this.runBus,
+      openRunLog: (runIds, logger, ctx) => new RunLogger(this.runBus, runIds, logger, ctx),
+      parseDiff: parseUnifiedDiff,
+      llmFor: (provider) => this.llm(provider),
+      get repoIntel() {
+        return c.repoIntel;
+      },
+      get git() {
+        return c.git;
+      },
+      skills: this.skillsRepo,
+      countTokens: (text) => this.tokenizer.count(text),
+    });
+    return this._reviewService;
   }
 
   get codeIndex(): CodeIndex {
@@ -114,9 +182,33 @@ export class Container {
    * Tests inject a mock via `ContainerOverrides.repoIntel`.
    */
   get repoIntel(): RepoIntel {
-    if (this.overrides.repoIntel) return this.overrides.repoIntel;
-    this._repoIntel ??= new RepoIntelService(this);
-    return this._repoIntel;
+    return this.overrides.repoIntel ?? this.repoIntelService;
+  }
+
+  /**
+   * The concrete facade + indexer (job handlers live here). Adapters are passed
+   * as lazy getters so they are still built on first use, as before.
+   */
+  get repoIntelService(): RepoIntelService {
+    const c = this; // the getters below read the live container
+    this._repoIntelService ??= new RepoIntelService({
+      repository: new RepoIntelRepository(this.db),
+      get git() {
+        return c.git;
+      },
+      get depgraph() {
+        return c.depgraph;
+      },
+      get tokenizer() {
+        return c.tokenizer;
+      },
+      get codeIndex() {
+        return c.codeIndex;
+      },
+      jobs: this.jobs,
+      enabled: this.config.repoIntelEnabled,
+    });
+    return this._repoIntelService;
   }
 
   /** Import-graph builder (dependency-cruiser). T3 indexer pipeline only. */
@@ -159,6 +251,18 @@ export class Container {
     if (!token) throw new ConfigError('GITHUB_TOKEN is not configured');
     this._github = new OctokitGitHubClient(token);
     return this._github;
+  }
+
+  /**
+   * The provider + model a system LLM feature (conventions, onboarding, …) runs
+   * on: the workspace's Settings override, else the registry default.
+   */
+  async featureModel(workspaceId: string, id: FeatureModelId): Promise<FeatureModelChoice> {
+    return resolveFeatureModel(
+      { settings: new DrizzleSettingsRepository(this.db), defaults: featureModelDefaults(FEATURE_MODELS) },
+      workspaceId,
+      id,
+    );
   }
 
   /** Resolve an LLM provider by id; constructs from the secret key, cached. */

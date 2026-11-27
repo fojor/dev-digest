@@ -7,10 +7,11 @@ Fastify 5 · Drizzle 0.45 + Postgres 16/pgvector · Zod 3.25 · fastify-type-pro
 - `pnpm typecheck` · `pnpm test` (unit + integration)
 - unit without Docker: `pnpm exec vitest run --exclude '**/*.it.test.ts'`
 - integration (Docker): `pnpm exec vitest run .it.test`
+- architecture gate: `pnpm exec vitest run test/architecture.test.ts` (readable: `pnpm exec depcruise src --config .dependency-cruiser.cjs --ignore-known`); baseline only shrinks — skill `onion-architecture`
 - Migrations are not automatic: `pnpm db:generate` → `pnpm db:migrate`; `pnpm db:seed` is idempotent
 
 ## Map
-- src/modules/<feature>/ — routes → service → repository; static registry: modules/index.ts
+- src/modules/<feature>/ — onion modules (agents, settings, workspace, polling, pulls, repos, reviews): `domain/ application/ infrastructure/ http/` + `index.ts` (reviews' service is built in the container from `ReviewDeps`, shared with the boot reaper); repo-intel: facade with narrow deps (`RepoIntelDeps`), routes in `http/`; static registry: modules/index.ts
 - src/platform/container.ts — DI composition root; local-only.ts — Host/Origin guard
 - src/adapters/ — github, git, llm, astgrep, depgraph, tokenizer, secrets (mocks: adapters/mocks.ts)
 - src/db/schema/ — tables for ALL milestones up front, most of them empty — by design
@@ -18,7 +19,7 @@ Fastify 5 · Drizzle 0.45 + Postgres 16/pgvector · Zod 3.25 · fastify-type-pro
 
 ## Conventions
 - All documentation is written in English (CLAUDE.md, README, specs, INSIGHTS, code comments)
-- Adapters and shared repositories — only via `container.*`, no `new` inside a module
+- Adapters and shared repositories — only via `container.*`; inside a module only its `index.ts` factory may `new` its own repository/service
 - A module never imports from another module's folder
 - New module → register it in modules/index.ts (@fastify/autoload is in deps but unused)
 - A test that imports test/helpers/pg.ts must have the `*.it.test.ts` suffix
@@ -39,6 +40,7 @@ Fastify 5 · Drizzle 0.45 + Postgres 16/pgvector · Zod 3.25 · fastify-type-pro
 - Before adding or changing a route → read README.md ("API map", "Request & DI flow")
 - Before changing what goes into the review prompt → read README.md ("Review context")
 - Before changing env/config → read README.md ("Environment")
+- Before adding a module, service, repository, adapter or port, or reviewing a backend diff → skill `onion-architecture` (layering rules; most modules are legacy — see its migration policy)
 - Before changing repo-intel → read src/modules/repo-intel/README.md
 - Before changing feature behavior → read specs/<feature>.md if it exists
 - Before a design-level change → read docs/

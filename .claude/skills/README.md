@@ -9,6 +9,8 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [fastify-best-practices](fastify-best-practices/SKILL.md) | Backend | Fastify routes, plugins, JSON-schema validation, error handling |
 | [drizzle-orm-patterns](drizzle-orm-patterns/SKILL.md) | Backend | Drizzle schema, queries, relations, transactions, migrations |
 | [postgresql-table-design](postgresql-table-design/SKILL.md) | Backend | Postgres schema design, data types, indexing, constraints |
+| [onion-architecture](onion-architecture/SKILL.md) | Backend | Our own: onion rings for server/ + reviewer-core, inward-only dependencies, Fastify/Drizzle/Zod/DI rules, legacy migration |
+| [frontend-ui-architecture](frontend-ui-architecture/SKILL.md) | Frontend | Our own: where client/ code goes — components, constants, helpers/lib, types, hooks, business logic, API layer, import direction, Server/Client boundaries; sources S01–S86 in its README |
 | [next-best-practices](next-best-practices/SKILL.md) | Frontend | Next.js App Router, RSC boundaries, data fetching, optimization |
 | [react-best-practices](react-best-practices/SKILL.md) | Frontend | React anti-patterns, state management, hooks rules |
 | [react-testing-library](react-testing-library/SKILL.md) | Frontend | General-purpose React Testing Library guide with Vitest |
@@ -16,7 +18,12 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [typescript-expert](typescript-expert/SKILL.md) | Full-stack | Type-level programming, performance, tooling, migrations |
 | [security](security/SKILL.md) | Full-stack | OWASP Top 10:2025, auth, injection, uploads, secrets |
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
+| [demo-video](demo-video/SKILL.md) | Shared | Our own: scenario `docs/demos/<branch>.md` (drafted from a prompt or the branch via its template, or hand-written) → agent-browser run in its own Chrome → paced .mp4 with captions in `demo/<branch>/` (git-ignored), status written back into the scenario; human guide in its README.md |
 | [engineering-insights](engineering-insights/SKILL.md) | Shared | Learnings loop: reads and append-only writes per-module INSIGHTS.md; read/wrapup/guard hooks in ../settings.json |
+| [pr-self-review](pr-self-review/SKILL.md) | Shared | Our own: reviews all local changes before a PR — lint/typecheck/tests for touched packages, then the skills above on the files they cover (map: `skill-map.json`), Opus-verified CRITICALs → PASS/BLOCK verdict; `pr-gate` PreToolUse hook in ../settings.json refuses `gh pr create` / `git push` (open PR) without a PASS; `scripts/ci.mjs` runs the same repo rules in CI |
+
+**Adding or vendoring a skill?** Map it in `pr-self-review/skill-map.json` (paths it reviews +
+priority) or list it under `excluded` — the self-review refuses to run with an unmapped skill.
 
 ## What Are Skills?
 

@@ -24,7 +24,7 @@ Next.js 15.5 (App Router) · React 19 · TanStack Query · next-intl 3 · Zod 3.
 - Take primitives from src/vendor/ui; don't pull in a new UI library
 
 ## Gotchas
-- vendor/shared here lags behind server: LLMProvider.id has no `openrouter`, and `commitFiles`, `sync`, `diffNameOnly`, `sessionId` are missing
+- vendor/shared must equal server/src/vendor/shared (CI: scripts/check-contracts.sh) — change contracts in server, then `cp -R ../server/src/vendor/shared/. src/vendor/shared/`
 - Browser scenarios are covered by ../e2e, not by vitest here
 
 ## Do not touch
@@ -33,6 +33,7 @@ Next.js 15.5 (App Router) · React 19 · TanStack Query · next-intl 3 · Zod 3.
 ## Read when
 - Before adding or moving a page → read README.md ("UI route map")
 - Before using or adding a UI primitive → read src/vendor/ui/README.md
+- Before adding or moving a component, hook, helper, constant or type, or reviewing a client diff → skill `frontend-ui-architecture` (placement rules; existing code is partly legacy — see its policy)
 - Before changing feature behavior → read specs/<feature>.md if it exists
 - Before a design-level change → read docs/
 - Before editing anything here → read INSIGHTS.md

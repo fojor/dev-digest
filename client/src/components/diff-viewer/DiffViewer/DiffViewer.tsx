@@ -10,6 +10,7 @@ import type { PrFile } from "@/lib/types";
 import { type DiffCommentApi } from "../comments";
 import { s } from "../styles";
 import { FileCard } from "../FileCard";
+import { fileKeys } from "../helpers";
 
 export function DiffViewer({
   files,
@@ -22,10 +23,11 @@ export function DiffViewer({
   if (!files || files.length === 0) {
     return <div style={s.empty}>{t("diffViewer.noChangedFiles")}</div>;
   }
+  const keys = fileKeys(files);
   return (
     <div style={s.list}>
       {files.map((f, i) => (
-        <FileCard key={i} file={f} commenting={commenting} />
+        <FileCard key={keys[i]} file={f} commenting={commenting} />
       ))}
     </div>
   );

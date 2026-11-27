@@ -115,7 +115,7 @@ export type MemoryItem = z.infer<typeof MemoryItem>;
 export const SkillType = z.enum(['rubric', 'convention', 'security', 'custom']);
 export type SkillType = z.infer<typeof SkillType>;
 
-export const SkillSource = z.enum(['manual', 'imported_url', 'extracted', 'community']);
+export const SkillSource = z.enum(['manual', 'imported', 'imported_url', 'extracted', 'community']);
 export type SkillSource = z.infer<typeof SkillSource>;
 
 export const Skill = z.object({
@@ -128,8 +128,102 @@ export const Skill = z.object({
   enabled: z.boolean(),
   version: z.number().int(),
   evidence_files: z.array(z.string()).nullish(),
+  /** Time of the latest version (list endpoint); absent elsewhere. */
+  updated_at: z.string().optional(),
 });
 export type Skill = z.infer<typeof Skill>;
+
+/**
+ * Result of parsing an uploaded skill (.md or .zip) — nothing is stored yet.
+ * The user reviews it and confirms with a regular create (source 'imported').
+ * `ignored_files` lists every archive entry that was NOT read (scripts,
+ * binaries, extra docs); `executable` marks the ones that look runnable.
+ */
+export const SkillImportIgnoredFile = z.object({
+  path: z.string(),
+  executable: z.boolean(),
+});
+export type SkillImportIgnoredFile = z.infer<typeof SkillImportIgnoredFile>;
+
+export const SkillImportPreview = z.object({
+  name: z.string(),
+  description: z.string(),
+  type: SkillType,
+  body: z.string(),
+  /** File the core was taken from (e.g. "SKILL.md" or "my-skill/SKILL.md"). */
+  source_file: z.string(),
+  ignored_files: z.array(SkillImportIgnoredFile),
+  warnings: z.array(z.string()),
+});
+export type SkillImportPreview = z.infer<typeof SkillImportPreview>;
+
+/** How a skill version came to be (null on Phase 1 rows, which stored only the body). */
+export const SkillVersionKind = z.enum(['create', 'edit', 'import', 'restore']);
+export type SkillVersionKind = z.infer<typeof SkillVersionKind>;
+
+/**
+ * One immutable snapshot from a skill's history (newest first in the API).
+ * name / description / type / note / kind are null on rows written before
+ * full snapshots existed — the UI falls back to the current skill's fields.
+ */
+export const SkillVersion = z.object({
+  version: z.number().int(),
+  name: z.string().nullish(),
+  description: z.string().nullish(),
+  type: SkillType.nullish(),
+  body: z.string(),
+  note: z.string().nullish(),
+  kind: SkillVersionKind.nullish(),
+  created_at: z.string(),
+  /** True for the skill's current version. */
+  current: z.boolean(),
+});
+export type SkillVersion = z.infer<typeof SkillVersion>;
+
+/**
+ * Per-card numbers for the Skills page (one batch call). Rates are 0..1;
+ * null = no data in the window (rendered "—").
+ */
+export const SkillStatsSummary = z.object({
+  skill_id: z.string(),
+  /** Agents with an ENABLED link to the skill, now. */
+  used_by: z.number().int(),
+  /** Runs whose prompt contained the skill ÷ finished runs of agents linking it (window). */
+  pull_rate: z.number().min(0).max(1).nullable(),
+  /** accepted ÷ (accepted + dismissed) over findings attributed to the skill (window). */
+  accept_rate: z.number().min(0).max(1).nullable(),
+});
+export type SkillStatsSummary = z.infer<typeof SkillStatsSummary>;
+
+export const SkillStatsAgent = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+export type SkillStatsAgent = z.infer<typeof SkillStatsAgent>;
+
+export const SkillCategoryCount = z.object({
+  category: z.string(),
+  count: z.number().int(),
+});
+export type SkillCategoryCount = z.infer<typeof SkillCategoryCount>;
+
+/** The skill panel's Stats tab. Every time-based number covers `window_days`. */
+export const SkillStats = SkillStatsSummary.extend({
+  window_days: z.number().int(),
+  /** Findings attributed to the skill in the window. */
+  findings: z.number().int(),
+  /** The pull-rate fraction behind `pull_rate`. */
+  runs_with_skill: z.number().int(),
+  runs_total: z.number().int(),
+  /** The `used_by` agents. */
+  agents: z.array(SkillStatsAgent),
+  /** Attributed findings per category, non-zero only. */
+  categories: z.array(SkillCategoryCount),
+});
+export type SkillStats = z.infer<typeof SkillStats>;
+
+export const SkillTokens = z.object({ tokens: z.number().int() });
+export type SkillTokens = z.infer<typeof SkillTokens>;
 
 export const CommunitySkill = z.object({
   name: z.string(),
@@ -141,15 +235,69 @@ export const CommunitySkill = z.object({
 export type CommunitySkill = z.infer<typeof CommunitySkill>;
 
 // ---- Conventions ----
+/** Review status of a candidate (ADR-0001) — replaces the old `accepted` flag. */
+export const ConventionStatus = z.enum(['pending', 'accepted', 'rejected']);
+export type ConventionStatus = z.infer<typeof ConventionStatus>;
+
+export const CONVENTION_RULE_MAX = 1000;
+export const CONVENTION_CATEGORY_MAX = 40;
+
 export const ConventionCandidate = z.object({
   id: z.string(),
-  rule: z.string(),
-  evidence_path: z.string(),
-  evidence_snippet: z.string(),
+  /** Current (possibly edited) rule text. */
+  rule: z.string().min(1).max(CONVENTION_RULE_MAX),
+  /** The rule as the model proposed it; never changes after the run. */
+  original_rule: z.string().min(1).max(CONVENTION_RULE_MAX),
+  category: z.string().min(1).max(CONVENTION_CATEGORY_MAX),
+  evidence_path: z.string().min(1),
+  evidence_snippet: z.string().min(1),
+  /** 1-based line range of the fragment's first occurrence in the file. */
+  evidence_start_line: z.number().int().min(1),
+  evidence_end_line: z.number().int().min(1),
+  /**
+   * Clone HEAD the evidence was verified at — the client pins the GitHub link
+   * to it so the line range stays exact. null = unknown (legacy row, git
+   * unavailable); the link then falls back to the default branch.
+   */
+  evidence_commit_sha: z.string().nullable(),
   confidence: z.number().min(0).max(1),
-  accepted: z.boolean(),
+  status: ConventionStatus,
 });
 export type ConventionCandidate = z.infer<typeof ConventionCandidate>;
+
+/** Facts of the last successful extraction run (sample files, style configs not counted). */
+export const ConventionScan = z.object({
+  scanned_at: z.string(),
+  sample_count: z.number().int().min(0).max(12),
+});
+export type ConventionScan = z.infer<typeof ConventionScan>;
+
+export const ConventionList = z.object({
+  /** null = never scanned. */
+  scan: ConventionScan.nullable(),
+  /** True while an extraction runs for the repo — curation is read-only then. */
+  scanning: z.boolean(),
+  candidates: z.array(ConventionCandidate),
+});
+export type ConventionList = z.infer<typeof ConventionList>;
+
+export const ExtractionResult = ConventionList.extend({
+  /** Candidates stored by this run; 0 drives the «no new conventions» notice. */
+  new_count: z.number().int().min(0).max(20),
+});
+export type ExtractionResult = z.infer<typeof ExtractionResult>;
+
+/** Accept / reject / edit one candidate. Only the rule text and status are editable. */
+export const ConventionPatch = z
+  .object({
+    status: ConventionStatus.optional(),
+    rule: z.string().trim().min(1).max(CONVENTION_RULE_MAX).optional(),
+  })
+  .strict()
+  .refine((p) => p.status !== undefined || p.rule !== undefined, {
+    message: 'Provide status or rule',
+  });
+export type ConventionPatch = z.infer<typeof ConventionPatch>;
 
 // ---- Agents ----
 // 'openrouter' routes through the OpenAI-compatible API (OpenAIProvider with a
@@ -188,6 +336,8 @@ export const Agent = z.object({
   // Inject repo-intel context (repo skeleton + callers + rank note) into this
   // agent's review prompt. Default on; gated again by the global flag.
   repo_intel: z.boolean().default(true),
+  /** Enabled skill links (the list endpoint only); absent elsewhere. */
+  skill_count: z.number().int().optional(),
 });
 export type Agent = z.infer<typeof Agent>;
 
@@ -195,6 +345,8 @@ export const AgentSkillLink = z.object({
   agent_id: z.string(),
   skill_id: z.string(),
   order: z.number().int(),
+  /** Per-agent switch; a disabled link keeps its position but skips the prompt. */
+  enabled: z.boolean(),
 });
 export type AgentSkillLink = z.infer<typeof AgentSkillLink>;
 

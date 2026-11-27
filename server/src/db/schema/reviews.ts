@@ -1,8 +1,9 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, uuid, text, integer, jsonb, timestamp, doublePrecision } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, jsonb, timestamp, doublePrecision, index } from 'drizzle-orm/pg-core';
 import { now } from './_shared';
 import { workspaces } from './core';
 import { pullRequests } from './pulls';
+import { skills } from './skills';
 
 // ============================================================ Review & findings
 
@@ -23,7 +24,11 @@ export const reviews = pgTable('reviews', {
   score: integer('score'),
   model: text('model'),
   createdAt: now(),
-});
+}, (t) => ({
+  // FK/lookup indexes (improvement plan D1): reviews per PR, by run.
+  prIdx: index('reviews_pr_idx').on(t.prId),
+  runIdx: index('reviews_run_idx').on(t.runId),
+}));
 
 export const findings = pgTable('findings', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -43,7 +48,14 @@ export const findings = pgTable('findings', {
   trifectaComponents: jsonb('trifecta_components').$type<string[]>(),
   acceptedAt: timestamp('accepted_at', { withTimezone: true }),
   dismissedAt: timestamp('dismissed_at', { withTimezone: true }),
-});
+  // The skill whose rule produced the finding (model-tagged, validated against
+  // the run's run_skills); null = unattributed. Survives as null if the skill is deleted.
+  skillId: uuid('skill_id').references(() => skills.id, { onDelete: 'set null' }),
+}, (t) => ({
+  // Findings are loaded per review (IN list) and cascade-deleted with it.
+  reviewIdx: index('findings_review_idx').on(t.reviewId),
+  skillIdx: index('findings_skill_idx').on(t.skillId),
+}));
 
 export const prIntent = pgTable('pr_intent', {
   prId: uuid('pr_id')

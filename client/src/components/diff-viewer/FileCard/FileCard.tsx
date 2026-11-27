@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { Icon } from "@devdigest/ui";
 import type { PrFile } from "@/lib/types";
 import { AUTO_EXPAND_MAX_LINES } from "../constants";
-import { parsePatch, type Line } from "../helpers";
+import { lineKeys, parsePatch, type Line } from "../helpers";
 import {
   buildThreads,
   keysForLine,
@@ -36,6 +36,7 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
     (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES
   );
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
+  const keys = React.useMemo(() => lineKeys(lines), [lines]);
 
   // Group this file's comments into threads, then split into ones we can anchor
   // to a rendered line vs. "outdated" (GitHub dropped the line / it's not here).
@@ -80,11 +81,12 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
           ) : (
             lines.map((ln, i) => (
               <CodeLine
-                key={i}
+                key={keys[i]}
                 ln={ln}
                 path={file.path}
                 threads={threadsForLine(ln, matched)}
                 commenting={commenting}
+                addCommentLabel={t("diffViewer.addComment")}
               />
             ))
           )}

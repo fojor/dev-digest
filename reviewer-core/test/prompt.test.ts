@@ -64,3 +64,31 @@ describe('assemblePrompt — ## PR description', () => {
     expect((assembly.pr_description as string).length).toBe(4000);
   });
 });
+
+// M2 Phase 2 — the skill block format is pinned by a fixture the client
+// Preview test reads too, so the two renderers cannot drift.
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { renderSkillBlock, SKILL_ATTRIBUTION_RULE, assemblePrompt as assembleForSkills } from '../src/prompt.js';
+
+describe('renderSkillBlock (shared fixture)', () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      fileURLToPath(new URL('../../docs/skills/fixtures/skill-block.fixture.json', import.meta.url)),
+      'utf8',
+    ),
+  ) as { cases: { input: { name: string; description: string; body: string }; expected: string }[] };
+
+  it.each(fixture.cases)('renders $input.name', ({ input, expected }) => {
+    expect(renderSkillBlock(input)).toBe(expected);
+  });
+
+  it('puts the attribution rule under Skills / rules only when skills exist', () => {
+    const withSkills = assembleForSkills({ system: 's', diff: 'd', skills: ['### Skill: a\n\nx'] });
+    expect(withSkills.assembly.user).toContain(`## Skills / rules\n${SKILL_ATTRIBUTION_RULE}\n\n### Skill: a`);
+    // The trace's skills block stays the skills alone (its token count = sum of blocks).
+    expect(withSkills.assembly.skills).toBe('### Skill: a\n\nx');
+    const without = assembleForSkills({ system: 's', diff: 'd' });
+    expect(without.assembly.user).not.toContain(SKILL_ATTRIBUTION_RULE);
+  });
+});

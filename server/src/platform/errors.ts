@@ -39,3 +39,30 @@ export class ConfigError extends AppError {
     super('config_error', message, 500, details);
   }
 }
+
+/**
+ * HTTP status for each DomainError code (modules/_shared/domain/errors.ts).
+ * Domain code never knows its status; the error handler in app.ts looks it up
+ * here. An unmapped code falls back to 400.
+ */
+export const DOMAIN_STATUS: Readonly<Record<string, number>> = {
+  agent_not_found: 404,
+  agent_version_not_found: 404,
+  skill_not_found: 404,
+  skill_version_not_found: 404,
+  invalid_skill_import: 400,
+  repo_not_found: 404,
+  invalid_repo_url: 400,
+  invalid_run_request: 400,
+  finding_not_found: 404,
+  invalid_action: 400,
+  review_not_found: 404,
+  run_trace_not_found: 404,
+  pull_not_found: 404,
+  github_unavailable: 400,
+  github_comment_failed: 400,
+  conventions_repo_not_indexed: 409,
+  conventions_scan_in_progress: 409,
+  conventions_extraction_failed: 502,
+  convention_not_found: 404,
+};

@@ -21,5 +21,12 @@ clones/
 playwright-report/
 test-results/
 
+# demo videos and their steps files (skill demo-video)
+demo/
+
 # emdash worktree config (local)
 .emdash.json
+
+# per-developer local settings
+.claude/*.local.md
+.worktrees/

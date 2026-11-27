@@ -32,7 +32,8 @@ results rather than throwing).
 
 ## Facade (`repoIntel.*`)
 
-Everything downstream reads through one facade (`service.ts`) so consumers never
+Everything downstream reads through one facade (`service.ts`, reached as `container.repoIntel`;
+its deps are built in `platform/container.ts`, never the Container itself) so consumers never
 touch the pipeline internals:
 
 - `getRepoMap(repoId)` → the cached repo skeleton (fed into the **review prompt**).
@@ -43,7 +44,7 @@ touch the pipeline internals:
 - `getConventionSamples(repoId)` → top-ranked files for convention extraction (L02).
 
 In the starter, only `getRepoMap` / `getFileRank` / `getCallerSignatures` are
-wired — into `modules/reviews/run-executor.ts`, which adds the repo map and a
+wired — into `modules/reviews/application/run-agent.ts` (via `run-context.ts`), which adds the repo map and a
 high-blast-radius note to the prompt. Toggled by `REPO_INTEL_ENABLED` (global)
 and a per-agent `repo_intel` flag.
 

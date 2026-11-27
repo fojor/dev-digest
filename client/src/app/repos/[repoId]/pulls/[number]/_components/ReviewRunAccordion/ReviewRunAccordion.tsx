@@ -6,11 +6,12 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { Icon, Badge } from "@devdigest/ui";
 import type { ReviewRecord, Verdict } from "@devdigest/shared";
 import { FindingsPanel } from "../FindingsPanel";
 import { VerdictBanner } from "../VerdictBanner";
-import { useDeleteReview } from "../../../../../../../lib/hooks/reviews";
+import { useDeleteReview } from "@/lib/hooks/reviews";
 
 const VERDICT_COLOR: Record<string, string> = {
   request_changes: "var(--crit)",
@@ -42,15 +43,23 @@ export function ReviewRunAccordion({
   targetRunId?: string | null;
   targetNonce?: number;
 }) {
-  const [open, setOpen] = React.useState(defaultOpen);
+  const t = useTranslations("prReview");
+  const isTarget = !!review.run_id && review.run_id === targetRunId;
+  const [open, setOpen] = React.useState(defaultOpen || isTarget);
+  // Open when the Timeline targets this run (a new nonce re-targets the same run).
+  // Adjusted during render — no effect needed to derive UI state.
+  const targetKey = `${targetRunId ?? ""}|${targetNonce}|${review.run_id ?? ""}`;
+  const [seenTargetKey, setSeenTargetKey] = React.useState(targetKey);
+  if (seenTargetKey !== targetKey) {
+    setSeenTargetKey(targetKey);
+    if (isTarget) setOpen(true);
+  }
+  // Scrolling is a DOM side effect, so it stays in an effect (runs after the
+  // opened body has been committed).
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   React.useEffect(() => {
-    if (review.run_id && review.run_id === targetRunId) {
-      setOpen(true);
-      rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetRunId, targetNonce, review.run_id]);
+    if (isTarget) rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [isTarget, targetNonce]);
   const del = useDeleteReview(prId);
   const findings = review.findings;
   const blockers = findings.filter((f) => f.severity === "CRITICAL" && !f.dismissed_at).length;
@@ -87,15 +96,15 @@ export function ReviewRunAccordion({
         }}
       >
         <Icon.Cpu size={15} style={{ color: "var(--text-muted)" }} />
-        <span style={{ fontWeight: 600, fontSize: 14 }}>{review.agent_name ?? "Agent"}</span>
+        <span style={{ fontWeight: 600, fontSize: 14 }}>{review.agent_name ?? t("reviewRun.agentFallback")}</span>
         {review.verdict && (
           <Badge color={verdictColor} bg="transparent">
             {review.verdict.replace("_", " ")}
           </Badge>
         )}
         <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
-          {findings.length} finding{findings.length === 1 ? "" : "s"}
-          {blockers > 0 ? ` · ${blockers} blocker${blockers === 1 ? "" : "s"}` : ""}
+          {t("reviewRun.findings", { count: findings.length })}
+          {blockers > 0 ? t("reviewRun.blockers", { count: blockers }) : ""}
         </span>
         <span style={{ flex: 1 }} />
         {review.score != null && (
@@ -109,13 +118,13 @@ export function ReviewRunAccordion({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            if (window.confirm(`Delete this "${review.agent_name ?? "agent"}" review run and its findings?`)) {
+            if (window.confirm(t("reviewRun.deleteConfirm", { agent: review.agent_name ?? t("reviewRun.agentConfirmFallback") }))) {
               del.mutate(review.id);
             }
           }}
           disabled={del.isPending}
-          title="Delete this review run"
-          aria-label="Delete this review run"
+          title={t("reviewRun.delete")}
+          aria-label={t("reviewRun.delete")}
           style={{
             background: "none",
             border: "none",

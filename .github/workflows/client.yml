@@ -1,5 +1,5 @@
 # Client suite — Next.js web app (@devdigest/web).
-# Typecheck + component/unit tests (vitest + jsdom). Hermetic: no API, no DB,
+# Typecheck + lint (ESLint) + component/unit tests (vitest + jsdom). Hermetic: no API, no DB,
 # no browser — fetch is mocked in the tests. The full-stack browser flow lives
 # in e2e-web.yml.
 name: client
@@ -9,11 +9,12 @@ on:
     branches: [main]
     paths:
       - 'client/**'
+      - 'server/src/vendor/shared/**'
+      - 'scripts/check-contracts.sh'
       - '.github/workflows/client.yml'
-  pull_request:
-    paths:
-      - 'client/**'
-      - '.github/workflows/client.yml'
+  # Pull requests: called by pr-self-review.yml (the required check) when the diff touches
+  # this suite — see the `triggers` table in .claude/skills/pr-self-review/scripts/checks.mjs.
+  workflow_call:
 
 permissions:
   contents: read
@@ -32,6 +33,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The two vendored contract copies must stay identical (server is the source).
+      - name: Contracts in sync
+        working-directory: .
+        run: ./scripts/check-contracts.sh
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -45,5 +51,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm typecheck
+
+      - run: pnpm exec eslint .
 
       - run: pnpm test
