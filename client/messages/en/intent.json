@@ -40,6 +40,7 @@
     "forbidden": "access denied",
     "rate_limited": "rate limited",
     "is_pull_request": "is a pull request, not an issue",
+    "cross_repo": "in another repository, not read",
     "limit_reached": "limit reached",
     "invalid_path": "invalid path",
     "not_in_clone": "not in the local clone",

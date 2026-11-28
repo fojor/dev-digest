@@ -202,10 +202,14 @@ export class IntentService {
     });
 
     const issueTasks = issueRefs.map(async (i, idx): Promise<Planned> => {
-      const ref =
-        i.owner.toLowerCase() === repo.owner.toLowerCase() && i.name.toLowerCase() === repo.name.toLowerCase()
-          ? `#${i.number}`
-          : `${i.owner}/${i.name}#${i.number}`;
+      const sameRepo =
+        i.owner.toLowerCase() === repo.owner.toLowerCase() && i.name.toLowerCase() === repo.name.toLowerCase();
+      const ref = sameRepo ? `#${i.number}` : `${i.owner}/${i.name}#${i.number}`;
+      // The PR body is author-controlled: never let it steer the user's GitHub token at another
+      // (possibly private) repo and pull that issue's text into the prompt and the stored intent.
+      if (!sameRepo) {
+        return done('linked_issue', ref, i.relation, { status: 'unavailable', reason: 'cross_repo' });
+      }
       if (idx >= MAX_ISSUES) return skipped('linked_issue', ref, i.relation);
       const r = await this.withTimeout(() => this.deps.sources.issue({ owner: i.owner, name: i.name }, i.number));
       return done('linked_issue', ref, i.relation, r);

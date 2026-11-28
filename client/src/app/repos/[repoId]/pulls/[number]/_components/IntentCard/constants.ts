@@ -22,6 +22,7 @@ export const KNOWN_REASONS: readonly string[] = [
   "forbidden",
   "rate_limited",
   "is_pull_request",
+  "cross_repo",
   "limit_reached",
   "invalid_path",
   "not_in_clone",
