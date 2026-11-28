@@ -7,11 +7,18 @@ import { z } from 'zod';
 
 // ---- Intent ----
 export const Intent = z.object({
-  intent: z.string(),
+  summary: z.string(),
   in_scope: z.array(z.string()),
   out_of_scope: z.array(z.string()),
 });
 export type Intent = z.infer<typeof Intent>;
+
+export const IntentConfidence = z.enum(['high', 'medium', 'low']);
+export type IntentConfidence = z.infer<typeof IntentConfidence>;
+
+/** LLM structured output of the intent classifier; caps are enforced in the domain, not here. */
+export const IntentClassification = Intent.extend({ confidence: IntentConfidence });
+export type IntentClassification = z.infer<typeof IntentClassification>;
 
 // ---- Blast radius ----
 export const ChangedSymbol = z.object({

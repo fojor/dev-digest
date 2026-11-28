@@ -1,6 +1,7 @@
 import type { UnifiedDiff } from '@devdigest/shared';
-import type { Logger, ReviewRunDeps, ReviewsRepository } from '../domain/ports.js';
-import type { PullRequest, RepoCoordinates, ReviewAgent } from '../domain/types.js';
+import type { Logger, ReviewRunDeps, ReviewsRepository, RunLog } from '../domain/ports.js';
+import type { PullRequest, RepoCoordinates, ReviewAgent, ReviewIntent } from '../domain/types.js';
+import { REVIEW_INTENT_WAIT_MS } from './constants.js';
 import { loadDiff } from './diff-loader.js';
 import { RunCancelledError } from './run-types.js';
 import { runOneAgent } from './run-agent.js';
@@ -79,6 +80,8 @@ export class ReviewRunExecutor {
     }
     runLog.info(`Diff ready — ${diff.files.length} changed file(s); starting ${jobs.length} agent run(s)`);
 
+    const intent = await this.resolveIntent(workspaceId, pull, runLog, logger);
+
     for (const { agent, runId } of jobs) {
       const agentStart = Date.now();
       logger?.info(
@@ -86,7 +89,7 @@ export class ReviewRunExecutor {
         `review: agent "${agent.name}" started (${agent.provider}/${agent.model})`,
       );
       try {
-        const outcome = await runOneAgent(this.d, workspaceId, pull, repo, diff, agent, runId, runLog);
+        const outcome = await runOneAgent(this.d, workspaceId, pull, repo, diff, agent, runId, runLog, intent);
         logger?.info(
           {
             runId,
@@ -106,6 +109,62 @@ export class ReviewRunExecutor {
           `review: agent "${agent.name}" ${cancelled ? 'cancelled' : 'failed'}`,
         );
       }
+    }
+  }
+
+  /**
+   * Shared pre-work: the PR intent, resolved once for every queued run. Fail-open:
+   * an error or a timeout (REVIEW_INTENT_WAIT_MS) means "no intent, no scope filter".
+   */
+  private async resolveIntent(
+    workspaceId: string,
+    pull: PullRequest,
+    runLog: RunLog,
+    logger?: Logger,
+  ): Promise<ReviewIntent | null> {
+    const provider = this.d.intent;
+    if (!provider) return null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    try {
+      const call = provider.forReview(workspaceId, pull.id);
+      // The losing call may reject after the timeout wins: record it instead of leaving it unhandled.
+      // A rejection before the timeout reaches the catch below, so only late ones are logged here.
+      call.catch((err: unknown) => {
+        if (timedOut) {
+          logger?.warn(
+            { prId: pull.id, err: (err as Error)?.message ?? String(err) },
+            'review: intent resolution failed after the wait timed out',
+          );
+        }
+      });
+      const timeout = new Promise<'timeout'>((resolve) => {
+        timer = setTimeout(() => {
+          timedOut = true;
+          resolve('timeout');
+        }, REVIEW_INTENT_WAIT_MS);
+      });
+      const intent = await runLog.step('Resolving PR intent', () => Promise.race([call, timeout]), {
+        kind: 'tool',
+      });
+      if (intent === 'timeout') {
+        runLog.info('Intent unavailable (timeout) — reviewing without scope filter');
+        return null;
+      }
+      if (!intent) {
+        runLog.info('Intent unavailable (classification failed) — reviewing without scope filter');
+        return null;
+      }
+      runLog.info(
+        `Intent: ${intent.outcome} (confidence ${intent.confidence}; sources ${intent.sourcesSummary}; ` +
+          `scope filter ${intent.filterEnabled ? 'on' : 'off'})`,
+      );
+      return intent;
+    } catch (err) {
+      runLog.info(`Intent unavailable (${(err as Error).message}) — reviewing without scope filter`);
+      return null;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 }

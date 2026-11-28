@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { pgTable, uuid, text, integer, jsonb, timestamp, doublePrecision, index } from 'drizzle-orm/pg-core';
+import type { IntentSource } from '@devdigest/shared';
 import { now } from './_shared';
 import { workspaces } from './core';
 import { pullRequests } from './pulls';
@@ -51,6 +52,8 @@ export const findings = pgTable('findings', {
   // The skill whose rule produced the finding (model-tagged, validated against
   // the run's run_skills); null = unattributed. Survives as null if the skill is deleted.
   skillId: uuid('skill_id').references(() => skills.id, { onDelete: 'set null' }),
+  /** Scope tag from the intent layer: 'in_scope' | 'out_of_scope' | null (untagged). */
+  scope: text('scope'),
 }, (t) => ({
   // Findings are loaded per review (IN list) and cascade-deleted with it.
   reviewIdx: index('findings_review_idx').on(t.reviewId),
@@ -64,6 +67,24 @@ export const prIntent = pgTable('pr_intent', {
   intent: text('intent').notNull(),
   inScope: jsonb('in_scope').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   outOfScope: jsonb('out_of_scope').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  // Intent layer (M3). `intent` holds the summary text; failed attempts store ''.
+  status: text('status').notNull().default('ok'),
+  error: text('error'),
+  confidence: text('confidence').notNull().default('low'),
+  confidenceReasons: jsonb('confidence_reasons').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  sources: jsonb('sources').$type<IntentSource[]>().notNull().default(sql`'[]'::jsonb`),
+  promptComponents: jsonb('prompt_components')
+    .$type<Record<string, number>>()
+    .notNull()
+    .default(sql`'{}'::jsonb`),
+  headSha: text('head_sha'),
+  inputHash: text('input_hash'),
+  provider: text('provider'),
+  model: text('model'),
+  tokensIn: integer('tokens_in'),
+  tokensOut: integer('tokens_out'),
+  costUsd: doublePrecision('cost_usd'),
+  classifiedAt: timestamp('classified_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const prBrief = pgTable('pr_brief', {

@@ -42,6 +42,12 @@ import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
 import { FEATURE_MODELS, type FeatureModelChoice, type FeatureModelId } from '@devdigest/shared';
 import { DrizzleSettingsRepository } from '../modules/settings/infrastructure/settings.repository.js';
+import { createHash } from 'node:crypto';
+import { SafeFetcher } from '../adapters/safe-fetch/index.js';
+import { IntentService } from '../modules/intent/application/intent.service.js';
+import { DrizzleIntentRepository } from '../modules/intent/infrastructure/intent.repository.js';
+import { LlmIntentClassifier } from '../modules/intent/infrastructure/intent-classifier.js';
+import { GitSourceReader } from '../modules/intent/infrastructure/source-reader.js';
 import { featureModelDefaults } from '../modules/settings/domain/policies.js';
 import { resolveFeatureModel } from '../modules/settings/application/feature-models.js';
 
@@ -52,6 +58,23 @@ import { resolveFeatureModel } from '../modules/settings/application/feature-mod
  * Tests construct a container with `overrides` to inject mock adapters; the
  * Services depend on these interfaces, not the concrete classes.
  */
+/** The narrow structured logger the composition root hands to services (app.log satisfies it). */
+export interface AppLogger {
+  info(obj: object, msg?: string): void;
+  warn(obj: object, msg?: string): void;
+}
+
+const silentLogger: AppLogger = { info: () => undefined, warn: () => undefined };
+
+/** Error → loggable fields: message and code only, never a stack with request content. */
+function errFields(err: unknown): { err: string; code?: string } {
+  const e = err as { message?: unknown; code?: unknown } | null;
+  return {
+    err: String(e?.message ?? err),
+    ...(typeof e?.code === 'string' ? { code: e.code } : {}),
+  };
+}
+
 export interface ContainerOverrides {
   secrets?: SecretsProvider;
   auth?: AuthProvider;
@@ -97,8 +120,15 @@ export class Container {
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
   private _priceBook?: PriceBook;
+  private _intentService?: IntentService;
 
-  constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
+  constructor(
+    config: AppConfig,
+    db: Db,
+    private overrides: ContainerOverrides = {},
+    /** Injected at construction so every service gets the real logger regardless of plugin order. */
+    private readonly logger: AppLogger = silentLogger,
+  ) {
     this.config = config;
     this.db = db;
     this.secrets = overrides.secrets ?? new LocalSecretsProvider(config.secretsPath);
@@ -166,8 +196,34 @@ export class Container {
       },
       skills: this.skillsRepo,
       countTokens: (text) => this.tokenizer.count(text),
+      intent: { forReview: (workspaceId, prId) => this.intentService.forReview(workspaceId, prId) },
     });
     return this._reviewService;
+  }
+
+  /** PR intent classification (M3): one instance, shared by the intent routes and review runs. */
+  get intentService(): IntentService {
+    const c = this; // the getters below read the live container
+    this._intentService ??= new IntentService({
+      repo: new DrizzleIntentRepository(this.db),
+      sources: new GitSourceReader({
+        github: () => c.github(),
+        get git() {
+          return c.git;
+        },
+        fetcher: new SafeFetcher(),
+      }),
+      classifier: new LlmIntentClassifier({
+        resolveModel: (workspaceId) => c.featureModel(workspaceId, 'review_intent'),
+        llmFor: (provider) => c.llm(provider),
+        logError: (event, err) => this.logger.warn({ event, ...errFields(err) }, 'intent: unawaited failure'),
+      }),
+      countTokens: (text) => this.tokenizer.count(text),
+      hash: (text) => createHash('sha256').update(text).digest('hex'),
+      log: (line) => this.logger.info({ intentRun: line }, 'intent classification run'),
+      logError: (event, err) => this.logger.warn({ event, ...errFields(err) }, 'intent: unawaited failure'),
+    });
+    return this._intentService;
   }
 
   get codeIndex(): CodeIndex {

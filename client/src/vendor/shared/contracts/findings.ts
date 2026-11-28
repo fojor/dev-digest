@@ -68,6 +68,10 @@ export const Finding = z.object({
     .describe(
       'Exact name of the skill (from "Skills / rules") whose rule produced this finding; null when no skill applies.',
     ),
+  scope: z
+    .enum(['in_scope', 'out_of_scope'])
+    .nullish()
+    .describe('Set only when the prompt asks for scope tagging; never affects severity.'),
 });
 export type Finding = z.infer<typeof Finding>;
 

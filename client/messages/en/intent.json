@@ -1,0 +1,62 @@
+{
+  "title": "PR INTENT",
+  "classify": "Classify intent",
+  "reclassify": "Re-classify",
+  "retry": "Retry",
+  "classifying": "Classifying…",
+  "notClassified": "Intent has not been classified yet.",
+  "notClassifiedHint": "Classifying works out why this PR was opened and what it should change, so a review can focus on that scope.",
+  "inScope": "IN SCOPE",
+  "outOfScope": "OUT OF SCOPE",
+  "nothingStated": "Nothing stated",
+  "confidence": {
+    "high": "High confidence",
+    "medium": "Medium confidence",
+    "low": "Low confidence"
+  },
+  "lowConfidenceNotice": "Derived from title and file names only — scope filtering is off.",
+  "staleBadge": "PR changed since classification",
+  "staleHint": "The PR head or description changed after this was classified. Re-classify to refresh it; scope filtering is off until then.",
+  "failed": "Could not classify this PR.",
+  "filterOff": "Scope filtering is off for reviews of this PR.",
+  "sources": {
+    "title": "Sources ({count})",
+    "status": {
+      "fetched": "Read",
+      "missing": "Missing",
+      "unavailable": "Not accessible",
+      "skipped": "Skipped"
+    },
+    "relation": {
+      "closing": "closing",
+      "referenced": "referenced",
+      "linked": "linked",
+      "changed_in_pr": "changed in this PR"
+    }
+  },
+  "reasons": {
+    "no_github_token": "no GitHub token configured",
+    "not_found": "not found",
+    "forbidden": "access denied",
+    "rate_limited": "rate limited",
+    "is_pull_request": "is a pull request, not an issue",
+    "cross_repo": "in another repository, not read",
+    "limit_reached": "limit reached",
+    "invalid_path": "invalid path",
+    "not_in_clone": "not in the local clone",
+    "too_large": "too large",
+    "auth_required": "sign-in required",
+    "host_not_allowed": "host not allowed",
+    "private_address": "private address refused",
+    "timeout": "timed out",
+    "unsupported_content_type": "unsupported content type",
+    "fetch_failed": "could not be fetched",
+    "empty_description": "empty description",
+    "source_unavailable": "a referenced source is not accessible",
+    "no_credentials": "no API key for the intent model",
+    "unreadable_answer": "the model's answer was unreadable",
+    "model_unavailable": "the model is unavailable",
+    "no_files": "no changed files"
+  },
+  "classifiedBy": "Classified by {model} · {time}"
+}

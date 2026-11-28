@@ -42,6 +42,14 @@ export function wrapUntrusted(label: string, content: string): string {
 export const SKILL_ATTRIBUTION_RULE =
   "For each finding produced by one of these skills, set `skill` to that skill's name exactly; otherwise leave it null.";
 
+/**
+ * Trusted instruction placed after the derived-intent block when scope tagging
+ * is on. Separate from INJECTION_GUARD (which stays the single injection defense).
+ */
+export const SCOPE_RULE =
+  'Set `scope` on every finding: `in_scope` if it concerns what this PR sets out to change, ' +
+  'otherwise `out_of_scope`. Scope never changes severity or whether you report a defect.';
+
 /** What a skill contributes to the prompt (name + description head the body). */
 export interface SkillBlockInput {
   name: string;
@@ -93,6 +101,12 @@ export interface PromptParts {
    * undefined → section omitted.
    */
   prDescription?: string;
+  /**
+   * Derived PR intent (untrusted — derived from author text). `block` is the
+   * rendered text; `scopeTagging` adds the trusted SCOPE_RULE after it. Absent →
+   * the prompt is byte-identical to one without intent.
+   */
+  intent?: { block: string; scopeTagging: boolean };
   /** The unified diff / user task (untrusted content). */
   diff: string;
   /** Optional task framing line, e.g. "Review PR #482 '…'". */
@@ -133,6 +147,12 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
   if (prDescription) {
     userSections.push(`## PR description\n${wrapUntrusted('pr-description', prDescription)}`);
   }
+  if (parts.intent) {
+    const rule = parts.intent.scopeTagging ? `\n${SCOPE_RULE}` : '';
+    userSections.push(
+      `## PR intent (derived)\n${wrapUntrusted('derived-intent', parts.intent.block)}${rule}`,
+    );
+  }
   if (skillsBlock) {
     userSections.push(`## Skills / rules\n${SKILL_ATTRIBUTION_RULE}\n\n${skillsBlock}`);
   }
@@ -163,6 +183,7 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
     callers: parts.callers ?? null,
     repo_map: parts.repoMap ?? null,
     pr_description: prDescription ?? null,
+    ...(parts.intent ? { intent: parts.intent.block } : {}),
     user,
   };
 

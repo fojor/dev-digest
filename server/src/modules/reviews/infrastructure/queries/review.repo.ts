@@ -49,6 +49,7 @@ export async function insertFindings(
         kind: f.kind ?? 'finding',
         trifectaComponents: f.trifecta_components ?? null,
         skillId: f.skillId ?? null,
+        scope: f.scope ?? null,
       })),
     )
     .returning();

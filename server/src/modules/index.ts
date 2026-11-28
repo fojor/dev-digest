@@ -9,6 +9,7 @@ import skills from './skills/index.js';
 import reviews from './reviews/index.js';
 import repoIntel from './repo-intel/index.js';
 import conventions from './conventions/index.js';
+import intent from './intent/index.js';
 
 /**
  * Module registry. Each feature module is a Fastify plugin — legacy modules
@@ -35,4 +36,5 @@ export const modules: Record<string, FastifyPluginAsync> = {
   reviews,
   repoIntel,
   conventions,
+  intent,
 };

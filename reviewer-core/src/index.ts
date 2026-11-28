@@ -17,10 +17,22 @@ export {
   wrapUntrusted,
   renderSkillBlock,
   SKILL_ATTRIBUTION_RULE,
+  SCOPE_RULE,
   type SkillBlockInput,
   type PromptParts,
   type AssembledPrompt,
 } from './prompt.js';
+
+// Intent: classifier prompts, the rendered intent block, and the scope policy.
+export {
+  buildIntentMessages,
+  renderIntentBlock,
+  neutralizeDelimiters,
+  INTENT_SYSTEM,
+  type IntentPromptInput,
+  type ReviewIntentInput,
+} from './intent/prompt.js';
+export { applyScopePolicy, type ScopeOutcome } from './review/scope.js';
 
 // Citation grounding — the mandatory mechanical gate for diff findings.
 export { groundFindings, groundingSummary, type GroundingResult } from './grounding.js';

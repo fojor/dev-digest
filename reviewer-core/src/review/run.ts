@@ -9,6 +9,8 @@ import type {
 import { Review as ReviewSchema } from '@devdigest/shared';
 import { assemblePrompt } from '../prompt.js';
 import { groundFindings, groundingSummary } from '../grounding.js';
+import { applyScopePolicy, type ScopeOutcome } from './scope.js';
+import { renderIntentBlock, type ReviewIntentInput } from '../intent/prompt.js';
 import { reduceReviews, scoreFromFindings, sliceDiff } from './reduce.js';
 
 /**
@@ -73,6 +75,12 @@ export interface ReviewInput {
   prDescription?: string;
   /** Task framing line, e.g. "Review PR #482 …". */
   task?: string;
+  /**
+   * Derived PR intent (untrusted). When present it is added to the prompt;
+   * `applyScopeFilter` additionally asks for scope tags and runs the scope
+   * policy after grounding. Absent → behaviour identical to before.
+   */
+  intent?: ReviewIntentInput & { applyScopeFilter: boolean };
   /** Override the structured-output retry budget. */
   maxRetries?: number;
   /** Override the map-reduce line threshold. */
@@ -123,6 +131,8 @@ export interface ReviewOutcome {
   costUsd: number | null;
   /** Joined raw model outputs (for the run trace). */
   raw: string;
+  /** Scope-policy result (enabled=false when no intent / filter off). */
+  scope: ScopeOutcome;
 }
 
 function selectMode(strategy: ReviewStrategy, diff: UnifiedDiff, threshold: number): ReviewMode {
@@ -149,6 +159,14 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
     repoMap: input.repoMap,
     prDescription: input.prDescription,
     task: input.task,
+    ...(input.intent
+      ? {
+          intent: {
+            block: renderIntentBlock(input.intent),
+            scopeTagging: input.intent.applyScopeFilter,
+          },
+        }
+      : {}),
   };
 
   // Whole-diff assembly is the trace default; overwritten below for single-pass.
@@ -215,11 +233,20 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
   }
   emit('result', `Citation grounding: ${grounding}`);
 
-  // Score is derived from the findings that SURVIVED grounding (not the model's
-  // self-reported number, and not the pre-grounding set) so the score, the
-  // findings list, and the deterministic event always agree.
+  // Scope policy runs AFTER grounding (never before): it only sees grounded findings.
+  const scope = applyScopePolicy(ground.kept, { enabled: input.intent?.applyScopeFilter === true });
+  if (input.intent?.applyScopeFilter) {
+    for (const f of scope.filtered) {
+      emit('info', `scope filter ${f.reason}: "${f.finding.title}"`);
+    }
+    emit('result', scope.summary);
+  }
+
+  // Score is derived from the findings that SURVIVED grounding and the scope
+  // policy (not the model's self-reported number) so the score, the findings
+  // list, and the deterministic event always agree.
   return {
-    review: { ...merged, findings: ground.kept, score: scoreFromFindings(ground.kept) },
+    review: { ...merged, findings: scope.kept, score: scoreFromFindings(scope.kept) },
     grounding,
     dropped: ground.dropped,
     mode,
@@ -229,5 +256,11 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
     tokensOut,
     costUsd,
     raw: raws.join('\n---\n'),
+    scope: {
+      enabled: scope.enabled,
+      filtered: scope.filtered,
+      collapsedCount: scope.collapsedCount,
+      summary: scope.summary,
+    },
   };
 }

@@ -274,6 +274,46 @@ export class SimpleGitClient implements GitClient {
     }
     return readFile(target, 'utf8');
   }
+
+  async showFile(repo: RepoRef, sha: string, path: string, maxBytes: number): Promise<string> {
+    // Untrusted inputs: a 40-hex sha and a plain relative path only; `--end-of-options`
+    // keeps either from being read as a flag.
+    if (!/^[0-9a-f]{40}$/.test(sha)) throw gitFileError('invalid_argument', 'Invalid commit sha');
+    if (!isSafeGitPath(path)) throw gitFileError('invalid_argument', 'Invalid path');
+    const g = this.git(repo);
+    const spec = `${sha}:${path}`;
+    let size: number;
+    try {
+      const out = await g.raw(['cat-file', '-s', '--end-of-options', spec]);
+      size = Number.parseInt(out.trim(), 10);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      if (/bad object|not a valid object|unable to read|could not get object/i.test(msg)) {
+        throw gitFileError('missing_object', 'Object missing in clone');
+      }
+      throw gitFileError('not_found', 'File not found at commit');
+    }
+    if (!Number.isFinite(size)) throw gitFileError('not_found', 'File not found at commit');
+    if (size > maxBytes) throw gitFileError('too_large', 'File too large');
+    return g.raw(['show', '--end-of-options', spec]);
+  }
+}
+
+function gitFileError(
+  code: 'not_found' | 'too_large' | 'missing_object' | 'invalid_argument',
+  message: string,
+): Error {
+  return Object.assign(new Error(message), { code });
+}
+
+function isSafeGitPath(p: string): boolean {
+  return (
+    p.length > 0 &&
+    p.length <= 300 &&
+    !p.startsWith('/') &&
+    !/[\0\n\r:]/.test(p) &&
+    !p.split('/').some((seg) => seg === '..')
+  );
 }
 
 function parseBlamePorcelain(raw: string): BlameLine[] {

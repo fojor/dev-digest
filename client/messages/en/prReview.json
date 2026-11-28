@@ -1,4 +1,7 @@
 {
+  "overview": {
+    "description": "Description"
+  },
   "finding": {
     "accepted": "accepted",
     "dismissed": "dismissed",
@@ -9,7 +12,8 @@
     "replyToAuthor": "Reply to author",
     "replyPlaceholder": "Reply to the author about this finding…",
     "sendReply": "Send reply",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "outOfScope": "Out of scope"
   },
   "trifecta": {
     "lethal": "LETHAL TRIFECTA — ALL 3 PRESENT",

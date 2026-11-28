@@ -162,6 +162,8 @@ export interface GitHubClient {
   /** The open PR whose head is `branch`, if any (so re-publish reuses it). */
   findOpenPr(repo: RepoRef, branch: string): Promise<{ url: string } | null>;
   getIssue(repo: RepoRef, n: number): Promise<IssueMeta>;
+  /** Issues GitHub itself links as closed by this PR (GraphQL closingIssuesReferences). */
+  listClosingIssues(repo: RepoRef, n: number): Promise<{ owner: string; name: string; number: number }[]>;
   /** GET /user — for "posting as @user". */
   currentLogin(): Promise<string>;
 }
@@ -224,6 +226,11 @@ export interface GitClient {
   blame(repo: RepoRef, path: string): Promise<BlameLine[]>;
   log(repo: RepoRef, path?: string): Promise<GitCommit[]>;
   readFile(repo: RepoRef, path: string): Promise<string>;
+  /**
+   * Read `path` as of commit `sha` (`git show`). Throws an Error whose `code` is
+   * 'not_found' | 'too_large' | 'missing_object' | 'invalid_argument'.
+   */
+  showFile(repo: RepoRef, sha: string, path: string, maxBytes: number): Promise<string>;
   clonePathFor(repo: RepoRef): string;
 }
 
