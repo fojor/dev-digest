@@ -360,7 +360,46 @@ export class OctokitGitHubClient implements GitHubClient {
       title: res.data.title,
       body: res.data.body,
       state: res.data.state,
+      is_pull_request: res.data.pull_request != null,
     };
+  }
+
+  async listClosingIssues(
+    repo: RepoRef,
+    n: number,
+  ): Promise<{ owner: string; name: string; number: number }[]> {
+    interface ClosingResponse {
+      repository?: {
+        pullRequest?: {
+          closingIssuesReferences?: {
+            nodes?: ({ number: number; repository: { name: string; owner: { login: string } } } | null)[];
+          };
+        };
+      };
+    }
+    const res = await withRetry(() =>
+      withTimeout(
+        this.octokit.graphql<ClosingResponse>(
+          `query($owner: String!, $name: String!, $n: Int!) {
+            repository(owner: $owner, name: $name) {
+              pullRequest(number: $n) {
+                closingIssuesReferences(first: 10) {
+                  nodes { number repository { name owner { login } } }
+                }
+              }
+            }
+          }`,
+          { owner: repo.owner, name: repo.name, n },
+        ),
+        TIMEOUT,
+      ),
+    );
+    const nodes = res.repository?.pullRequest?.closingIssuesReferences?.nodes ?? [];
+    const out: { owner: string; name: string; number: number }[] = [];
+    for (const node of nodes) {
+      if (node) out.push({ owner: node.repository.owner.login, name: node.repository.name, number: node.number });
+    }
+    return out;
   }
 
   async currentLogin(): Promise<string> {

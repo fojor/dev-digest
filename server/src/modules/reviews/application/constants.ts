@@ -9,4 +9,7 @@
  * fails the entire run) and unnecessary — the whole diff already fits the
  * model's context.
  */
+/** Longest a review waits for the PR intent before going on without it (fail-open). */
+export const REVIEW_INTENT_WAIT_MS = 60_000;
+
 export const REVIEW_STRATEGY = 'single-pass' as const;

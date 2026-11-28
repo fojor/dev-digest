@@ -1,7 +1,7 @@
 import type { UnifiedDiff } from '@devdigest/shared';
 import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
 import type { ReviewRunDeps, RunLog } from '../domain/ports.js';
-import type { PullRequest, RepoCoordinates, ReviewAgent } from '../domain/types.js';
+import type { PullRequest, RepoCoordinates, ReviewAgent, ReviewIntent } from '../domain/types.js';
 import { REVIEW_STRATEGY } from './constants.js';
 import { attributeFindings, renderSkillBlock, taskLine } from './helpers.js';
 import { RunCancelledError, type RunOutcome } from './run-types.js';
@@ -28,6 +28,7 @@ export async function runOneAgent(
   agent: ReviewAgent,
   runId: string,
   parentLog: RunLog,
+  intent: ReviewIntent | null = null,
 ): Promise<RunOutcome> {
   const start = Date.now();
   // Per-call usage streamed from the engine. The source of truth on the
@@ -113,6 +114,20 @@ export async function runOneAgent(
       // truncates it. Omitted when the PR has no body.
       ...(pull.body ? { prDescription: pull.body } : {}),
       task,
+      // Derived PR intent (untrusted; wrapped by the prompt builder). The scope
+      // filter only runs when the intent policy enabled it.
+      ...(intent
+        ? {
+            intent: {
+              summary: intent.summary,
+              inScope: intent.inScope,
+              outOfScope: intent.outOfScope,
+              confidence: intent.confidence,
+              missingContext: intent.missingContext,
+              applyScopeFilter: intent.filterEnabled,
+            },
+          }
+        : {}),
       sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
       onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
       onUsage: (u) => {
@@ -128,6 +143,7 @@ export async function runOneAgent(
     const costUsd = runCost(tokensIn, tokensOut, outcome.costUsd);
 
     const keptFindings = outcome.review.findings;
+    if (intent && outcome.scope.enabled) runLog.info(outcome.scope.summary);
 
     // ---- Persist review + findings ----------------------------------------
     const review = await d.repo.insertReview({

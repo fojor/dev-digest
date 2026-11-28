@@ -55,6 +55,14 @@ export interface MockLLMOptions {
   embedding?: number[];
 }
 
+/** Canned answer for the intent classifier's 'IntentClassification' schema. */
+const CANNED_INTENT = {
+  summary: 'Mock intent: the PR changes configuration handling.',
+  in_scope: ['Configuration handling'],
+  out_of_scope: ['Unrelated refactors'],
+  confidence: 'medium',
+};
+
 export class MockLLMProvider implements LLMProvider {
   readonly id: 'openai' | 'anthropic';
   public calls: { method: string; req: unknown }[] = [];
@@ -88,7 +96,11 @@ export class MockLLMProvider implements LLMProvider {
 
   async completeStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {
     this.calls.push({ method: 'completeStructured', req });
-    const fixture = this.opts.structuredBySchema?.[req.schemaName] ?? this.opts.structured ?? {};
+    const fixture =
+      this.opts.structuredBySchema?.[req.schemaName] ??
+      (req.schemaName === 'IntentClassification' ? CANNED_INTENT : undefined) ??
+      this.opts.structured ??
+      {};
     const parsed = (req.schema as z.ZodType<T>).safeParse(fixture);
     if (!parsed.success) {
       throw new Error(`MockLLMProvider fixture failed schema: ${parsed.error.message}`);
@@ -234,6 +246,10 @@ export class MockGitHubClient implements GitHubClient {
     return { number: n, title: `Issue #${n}`, body: 'mock issue', state: 'open' };
   }
 
+  async listClosingIssues(): Promise<{ owner: string; name: string; number: number }[]> {
+    return [];
+  }
+
   async currentLogin(): Promise<string> {
     return this.opts.login ?? 'mock-user';
   }
@@ -243,6 +259,8 @@ export class MockGitHubClient implements GitHubClient {
 export interface MockGitOptions {
   diff?: string;
   files?: Record<string, string>;
+  /** Files readable via `showFile`, keyed by path (any sha). */
+  showFiles?: Record<string, string>;
   /** Name-only diff result (drives the incremental indexer's "changed files since X" path). */
   diffNameOnly?: string[];
   /** Override `currentHead()` so tests can simulate "sha unchanged since last index". */
@@ -292,6 +310,14 @@ export class MockGitClient implements GitClient {
   }
   async readFile(_repo: RepoRef, path: string): Promise<string> {
     return this.opts.files?.[path] ?? '';
+  }
+  async showFile(_repo: RepoRef, _sha: string, path: string, maxBytes: number): Promise<string> {
+    const content = this.opts.showFiles?.[path];
+    if (content === undefined) throw Object.assign(new Error('not found'), { code: 'not_found' });
+    if (Buffer.byteLength(content) > maxBytes) {
+      throw Object.assign(new Error('too large'), { code: 'too_large' });
+    }
+    return content;
   }
 }
 

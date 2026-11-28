@@ -88,6 +88,8 @@ export interface ReviewFinding {
   trifectaComponents: string[] | null;
   acceptedAt: Date | null;
   dismissedAt: Date | null;
+  /** Intent-layer scope tag: 'in_scope' | 'out_of_scope' | null (untagged). */
+  scope: string | null;
 }
 
 /** Fields of a new review row (the id and createdAt come from the store). */
@@ -146,6 +148,21 @@ export interface RunSkillRecord {
   position: number;
   /** Tokens of the skill's rendered block. */
   tokens: number;
+}
+
+/**
+ * The PR intent a review run uses (reviews-owned copy of the shape the intent
+ * module resolves; wired in platform/container.ts, never imported across modules).
+ */
+export interface ReviewIntent {
+  summary: string;
+  inScope: string[];
+  outOfScope: string[];
+  confidence: 'high' | 'medium' | 'low';
+  missingContext: string[];
+  filterEnabled: boolean;
+  sourcesSummary: string;
+  outcome: 'reused' | 'classified';
 }
 
 /** A finding to persist, with the skill it is attributed to (null = none). */

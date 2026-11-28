@@ -22,6 +22,7 @@ import type {
   PromptSkill,
   ReviewAgent,
   ReviewFinding,
+  ReviewIntent,
   AttributedFinding,
   RunSkillRecord,
 } from './types.js';
@@ -141,6 +142,11 @@ export type RunLogFactory = (runIds: string[], logger?: Logger, ctx?: Record<str
 /** Parses unified-diff text (the git adapter's parser). */
 export type DiffParser = (raw: string) => UnifiedDiff;
 
+/** Resolves the PR intent for a review run (null when unavailable: the run goes on without it). */
+export interface IntentProvider {
+  forReview(workspaceId: string, prId: string): Promise<ReviewIntent | null>;
+}
+
 /** What a background review run needs — never the Container itself. */
 export interface ReviewRunDeps {
   repo: ReviewsRepository;
@@ -153,6 +159,8 @@ export interface ReviewRunDeps {
   skills: AgentSkillsReader;
   /** Token count of a prompt fragment (tokenizer adapter) — for trace attribution. */
   countTokens: (text: string) => number;
+  /** PR intent resolver; absent → reviews run without an intent (fail-open). */
+  intent?: IntentProvider;
 }
 
 /** Built in platform/container.ts (`container.reviewService`). */
